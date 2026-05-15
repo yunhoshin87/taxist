@@ -53,6 +53,10 @@
     .topbar-title{font-size:1rem;font-weight:700;color:var(--navy)}
     .topbar-right{display:flex;align-items:center;gap:12px}
     .topbar-date{font-size:.8rem;color:var(--text-muted)}
+    .btn-topbar-logout{padding:6px 14px;border-radius:6px;background:transparent;
+                       border:1.5px solid var(--border);color:var(--text-muted);
+                       font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-topbar-logout:hover{border-color:#DC2626;color:#DC2626;background:#FEF2F2}
     .content{padding:28px;flex:1}
 
     /* STAT CARDS */
@@ -155,6 +159,7 @@
     <span class="topbar-title">대시보드</span>
     <div class="topbar-right">
       <span class="topbar-date" id="todayDate"></span>
+      <button class="btn-topbar-logout" onclick="logout()">로그아웃</button>
     </div>
   </div>
   <div class="content">
