@@ -1,11 +1,18 @@
 // JWT + 비밀번호 유틸 (Web Crypto API 기반, Cloudflare Workers 호환)
 
-const ENC = (obj) =>
-  btoa(JSON.stringify(obj))
-    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+// Unicode(한글 포함) 안전한 Base64url 인코딩
+const ENC = (obj) => {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin = "";
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+};
 
-const DEC = (str) =>
-  JSON.parse(atob(str.replace(/-/g, "+").replace(/_/g, "/")));
+const DEC = (str) => {
+  const bin  = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+};
 
 export async function signJWT(payload, secret, expiresIn = 86400 * 7) {
   payload.exp = Math.floor(Date.now() / 1000) + expiresIn;

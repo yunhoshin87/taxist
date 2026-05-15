@@ -53,6 +53,6 @@ export async function onRequestPost(context) {
     });
   } catch (e) {
     console.error("Login error:", e);
-    return json({ error: "서버 오류가 발생했습니다" }, 500);
+    return json({ error: "서버 오류가 발생했습니다", detail: e?.message || String(e) }, 500);
   }
 }
