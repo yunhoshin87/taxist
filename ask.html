@@ -283,16 +283,18 @@
 </div>
 
 <script>
-// ── 인증 체크 ──
-if (localStorage.getItem('userAuth') !== 'true') {
-  window.location.href = 'login.html';
-}
-document.getElementById('navName').textContent = localStorage.getItem('userName') || '사용자';
+// ── 인증 체크 (JWT 기반) ──
+const _token = localStorage.getItem('taxist_token');
+const _user  = JSON.parse(localStorage.getItem('taxist_user') || 'null');
+if (!_token || !_user) { window.location.href = 'login.html'; }
+document.getElementById('navName').textContent = _user?.name || '사용자';
 
 function doLogout() {
+  localStorage.removeItem('taxist_token');
+  localStorage.removeItem('taxist_user');
+  // 하위 호환
   localStorage.removeItem('userAuth');
   localStorage.removeItem('userName');
-  localStorage.removeItem('userEmail');
   window.location.href = 'index.html';
 }
 
@@ -344,120 +346,52 @@ function saveDraft() {
   }, 1500);
 }
 
-// ── 질문 이력 ──
-function getHistory() {
-  try { return JSON.parse(localStorage.getItem('taxistQuestions') || '[]'); } catch{ return []; }
-}
-function saveHistory(list) {
-  localStorage.setItem('taxistQuestions', JSON.stringify(list));
-}
-function renderHistory() {
-  const list = getHistory();
+// ── 질문 이력 (API 기반) ──
+async function renderHistory() {
   const container = document.getElementById('myqList');
-  const countEl = document.getElementById('myqCount');
-  countEl.textContent = list.length ? `(${list.length}건)` : '';
-  if(!list.length) {
-    container.innerHTML = '<p style="font-size:.83rem;color:var(--text-muted);padding:12px 0">아직 질문이 없습니다.</p>';
-    return;
+  const countEl   = document.getElementById('myqCount');
+  try {
+    const res  = await fetch('/api/questions', { headers: { Authorization: `Bearer ${_token}` } });
+    const data = await res.json();
+    const list = data.questions || [];
+    countEl.textContent = list.length ? `(${list.length}건)` : '';
+    if (!list.length) {
+      container.innerHTML = '<p style="font-size:.83rem;color:var(--text-muted);padding:12px 0">아직 질문이 없습니다.</p>';
+      return;
+    }
+    container.innerHTML = list.slice(0, 5).map(q => `
+      <div class="myq-item" onclick="loadQuestion(${q.id})">
+        <span class="myq-cat">${q.tax_category}</span>
+        <span class="myq-title">${q.title}</span>
+        <span class="myq-date">${q.created_at?.slice(0,10)}</span>
+      </div>`).join('');
+  } catch {
+    container.innerHTML = '<p style="font-size:.83rem;color:var(--text-muted)">이력을 불러오지 못했습니다.</p>';
   }
-  container.innerHTML = list.slice().reverse().slice(0,5).map((q,i)=>`
-    <div class="myq-item" onclick="loadHistory(${list.length-1-i})">
-      <span class="myq-cat">${q.tax}</span>
-      <span class="myq-title">${q.title}</span>
-      <span class="myq-date">${q.date}</span>
-    </div>`).join('') +
-    (list.length>5 ? `<p style="font-size:.78rem;color:var(--coral);margin-top:8px;cursor:pointer">+ ${list.length-5}건 더 보기</p>` : '');
 }
 renderHistory();
 
-function loadHistory(idx) {
-  const list = getHistory();
-  const q = list[idx];
-  if(!q) return;
-  document.getElementById('titleInput').value = q.title;
-  document.getElementById('editor').innerHTML = q.content;
-  selectTax(document.querySelectorAll('.tax-chip')[['법인세','부가세','조사','징세','재산세','개인세'].indexOf(q.tax)], q.tax);
-  showAnswer(q.tax, q.title, q.answer);
-  document.getElementById('page').classList.add('answer-visible');
-  window.scrollTo({top:0,behavior:'smooth'});
+async function loadQuestion(id) {
+  const res  = await fetch(`/api/questions/${id}`, { headers: { Authorization: `Bearer ${_token}` } });
+  const data = await res.json();
+  if (!data.question) return;
+  document.getElementById('titleInput').value = data.question.title;
+  document.getElementById('editor').innerHTML  = data.question.content;
+  const cats = ['법인세','부가세','조사','징세','재산세','개인세'];
+  const idx  = cats.indexOf(data.question.tax_category);
+  if (idx >= 0) selectTax(document.querySelectorAll('.tax-chip')[idx], data.question.tax_category);
+  if (data.answer) {
+    showAnswer(data.question.tax_category, data.answer.content, data.answer.sources || []);
+    document.getElementById('page').classList.add('answer-visible');
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── 답변 생성 ──
-const ANSWERS = {
-  '법인세': {
-    issue:'법인이 특수관계인과의 거래에서 시가보다 낮은 가액으로 자산을 처분한 경우, 법인세법 제52조에 따른 부당행위계산 부인 규정의 적용 가능성 및 시가 산정 방법에 관한 검토',
-    facts:'법인세법 §52, 시행령 §88에 따라 특수관계인 범위는 주주·임원·직원 및 그 친족 등을 포함합니다. 시가보다 낮은 가액으로 거래한 경우 부당행위 해당 여부는 거래 당시 불특정 다수인 간 통상적으로 이루어지는 가격을 기준으로 판단합니다.',
-    laws:[
-      {type:'법령', name:'법인세법 §52', desc:'부당행위계산 부인 요건 및 범위'},
-      {type:'법령', name:'법인세법 시행령 §88', desc:'부당행위 유형 및 시가 산정 기준'},
-      {type:'판례', name:'대법원 2021두52631', desc:'특수관계인 간 저가 양도 시가 산정'},
-      {type:'예규', name:'법인세과-1234 (2022)', desc:'시가 불분명 시 보충적 평가 방법'},
-    ],
-    opinion:'판례(대법원 2021두52631)에 따르면, 특수관계인에게 시가의 70% 미만으로 자산을 양도한 경우 부당행위계산 부인 규정이 적용되며, 시가와 거래가액의 차액을 익금 산입합니다. 상장 주식의 경우 양도일 전후 2개월 평균 종가를 시가로 사용하며, 비상장 주식은 보충적 평가 방법(순자산가치 및 순손익가치)을 적용합니다.',
-    sources:['2024 포인트 법인조정 실무_개정7판 p.342', '2022 법인세 상담사례집 §5-3', '2025 소득처분 이론과 실무 p.118'],
-  },
-  '부가세': {
-    issue:'용역 공급 시기와 세금계산서 발급 시기가 상이한 경우, 부가가치세법상 세금계산서 발급 의무 이행 여부 및 가산세 적용 가능성 검토',
-    facts:'부가가치세법 §15(용역의 공급 시기), §32(세금계산서 발급 의무) 및 시행령 §28에 따라 용역 공급 시기는 역무 제공 완료일 또는 대가 수령일 중 빠른 날을 기준으로 합니다.',
-    laws:[
-      {type:'법령', name:'부가가치세법 §15', desc:'용역의 공급 시기 기준'},
-      {type:'법령', name:'부가가치세법 §32', desc:'세금계산서 발급 의무 및 시기'},
-      {type:'판례', name:'대법원 2022두11234', desc:'용역 완료 전 대가 수령 시 공급 시기'},
-      {type:'예규', name:'부가세과-567 (2023)', desc:'계속 공급 용역의 세금계산서 발행 시기'},
-    ],
-    opinion:'계속적 용역의 경우 대가 수령 시점이 공급 시기가 됩니다. 세금계산서는 공급 시기 이후 다음달 10일 이내에 발급할 수 있으며(월합 세금계산서), 이 기간을 초과하면 공급가액의 1% 가산세가 적용됩니다. 공급 시기가 도래하기 전에 선발급한 경우에도 사실과 다른 세금계산서에 해당할 수 있으니 주의가 필요합니다.',
-    sources:['2023 부가가치세 실무_개정증보18판 p.215', '부가세 행정해석 사례집'],
-  },
-  '조사': {
-    issue:'세무조사 사전통지 생략 요건 및 조사 절차의 적정성에 관한 검토',
-    facts:'국세기본법 §81조의5에 따라 세무조사 시 조사 개시 15일 전에 사전통지를 원칙으로 합니다. 다만, 증거인멸·도피 우려 등 예외 사유가 있는 경우 사전통지를 생략할 수 있습니다.',
-    laws:[
-      {type:'법령', name:'국세기본법 §81조의5', desc:'세무조사 사전통지 원칙 및 예외'},
-      {type:'법령', name:'국세기본법 §81조의3', desc:'세무조사 납세자 권리'},
-      {type:'판례', name:'대법원 2020두44567', desc:'사전통지 생략 요건 적법성 판단'},
-    ],
-    opinion:'사전통지 생략은 ① 증거인멸 우려, ② 국외 도피 우려, ③ 정기 조사 대상자가 동의하는 경우에 허용됩니다. 생략 시에는 조사 개시와 동시에 납세자 권리헌장을 교부해야 하며, 조사 목적·범위·기간을 서면으로 고지해야 합니다. 요건을 충족하지 않은 생략은 절차 하자로 과세처분 취소 사유가 될 수 있습니다.',
-    sources:['세무조사 절차 핸드북 p.45', '국세행정 업무 지침 §3-2'],
-  },
-  '징세': {
-    issue:'체납처분 절차에서 압류 재산 공매 시 우선채권자 순위 결정 기준 및 배당 방법 검토',
-    facts:'국세징수법 §92 이하에 따라 체납자 소유 재산에 대한 압류 및 공매 절차가 진행되며, 배당 순위는 법령에 따라 엄격하게 정해집니다.',
-    laws:[
-      {type:'법령', name:'국세징수법 §92', desc:'압류 재산 공매 절차'},
-      {type:'법령', name:'국세기본법 §35', desc:'국세 우선의 원칙'},
-      {type:'판례', name:'대법원 2019다234567', desc:'근저당권과 국세 우선권 충돌 해결'},
-    ],
-    opinion:'배당 우선 순위: ① 집행비용, ② 소액 임차보증금(주임법), ③ 설정일이 국세 납세의무 성립일보다 앞선 근저당권, ④ 국세·가산금, ⑤ 일반 채권 순입니다. 다만, 법정기일 이후 설정된 근저당권은 국세보다 후순위가 되므로 납세의무 성립일과 등기 설정일을 반드시 비교해야 합니다.',
-    sources:['체납처분 실무 지침 p.87', '조세채권 우선권 판례 해설'],
-  },
-  '재산세': {
-    issue:'공동주택 과세기준일 현재 공부상 현황과 실질 현황이 상이한 경우 재산세 과세 방법 및 이의신청 절차 검토',
-    facts:'지방세법 §105(과세 대상), §106(과세 기준), §111(과세표준)에 따라 재산세는 과세기준일(6월 1일) 현재의 현황을 기준으로 부과됩니다.',
-    laws:[
-      {type:'법령', name:'지방세법 §105', desc:'재산세 과세 대상 범위'},
-      {type:'법령', name:'지방세법 §118', desc:'이의신청 절차 및 기한'},
-      {type:'판례', name:'대법원 2021두34521', desc:'공부상 현황 vs 실질 현황 과세 기준'},
-    ],
-    opinion:'실질 현황 우선 원칙에 따라 공부상 창고이더라도 실제 주거용으로 사용 중이면 주택 세율을 적용합니다. 이의신청은 납세고지서 수령일로부터 90일 이내에 관할 지방자치단체장에게 제출해야 합니다. 시가표준액 산정에 이의가 있는 경우에는 별도로 적용기준일로부터 60일 이내에 신청해야 합니다.',
-    sources:['재산세 과세대상 판단 기준 p.33', '지방세 행정해석 사례집 §4-1'],
-  },
-  '개인세': {
-    issue:'비거주자의 국내 부동산 양도소득세 신고 의무 및 절차, 세율 적용 방법 검토',
-    facts:'소득세법 §119(비거주자의 국내원천소득)에 따라 비거주자도 국내 소재 부동산 양도 시 양도소득세 납세 의무가 발생합니다.',
-    laws:[
-      {type:'법령', name:'소득세법 §119', desc:'비거주자 국내원천소득 과세'},
-      {type:'법령', name:'소득세법 §156조의2', desc:'비거주자 양도소득 신고 절차'},
-      {type:'조약', name:'한미 조세조약 §13', desc:'부동산 양도 소득 과세권 배분'},
-    ],
-    opinion:'비거주자의 국내 부동산 양도소득세는 양도일이 속하는 달의 말일부터 2개월 이내에 신고·납부해야 합니다. 세율은 거주자와 동일하게 6~45% 누진세율이 적용되며, 1세대 1주택 비과세는 원칙적으로 적용되지 않습니다. 다만 조세조약이 체결된 국가의 거주자는 조약에 따라 과세권이 제한될 수 있습니다.',
-    sources:['양도소득세 계산 실무 p.210', '비거주자 세무 안내 책자'],
-  },
-};
-
-function submitQuestion() {
-  const title = document.getElementById('titleInput').value.trim();
-  const content = document.getElementById('editor').innerHTML;
-  if(!selectedTax || !title) return;
+// ── 답변 생성 (실제 API 호출) ──
+async function submitQuestion() {
+  const title   = document.getElementById('titleInput').value.trim();
+  const content = document.getElementById('editor').innerText.trim();
+  if (!selectedTax || !title || !content) return;
 
   const btn = document.getElementById('submitBtn');
   btn.textContent = 'AI 분석 중...';
@@ -465,54 +399,59 @@ function submitQuestion() {
 
   document.getElementById('answerCol').classList.add('visible');
   document.getElementById('loadingCard').style.display = 'block';
-  document.getElementById('answerCard').style.display = 'none';
+  document.getElementById('answerCard').style.display  = 'none';
   document.getElementById('page').classList.add('answer-visible');
-  document.getElementById('answerCard').scrollIntoView({behavior:'smooth', block:'start'});
 
-  const answer = ANSWERS[selectedTax] || ANSWERS['법인세'];
+  try {
+    const res  = await fetch('/api/questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_token}` },
+      body: JSON.stringify({ tax_category: selectedTax, title, content }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '오류가 발생했습니다');
 
-  setTimeout(()=>{
     document.getElementById('loadingCard').style.display = 'none';
-    showAnswer(selectedTax, title, answer);
-    // 이력 저장
-    const list = getHistory();
-    list.push({tax:selectedTax, title, content, answer, date:new Date().toLocaleDateString('ko-KR')});
-    saveHistory(list);
+    showAnswer(selectedTax, data.answer.content, data.answer.sources || []);
     renderHistory();
+  } catch (e) {
+    document.getElementById('loadingCard').style.display = 'none';
+    alert('답변 생성 실패: ' + e.message);
+  } finally {
     btn.textContent = 'AI 답변 받기';
-    btn.disabled = false;
-  }, 3000);
+    btn.disabled    = false;
+  }
 }
 
-function showAnswer(tax, title, answer) {
+// Markdown 간이 렌더러
+function renderMd(md) {
+  return md
+    .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:.95rem;color:var(--navy)">$1</h3>')
+    .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;font-size:.88rem">$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\|(.+)\|$/gm, (row) => {
+      if (/^[\s|:-]+$/.test(row)) return '';
+      const cells = row.split('|').slice(1,-1).map(c=>`<td style="padding:6px 10px;border:1px solid var(--border)">${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .replace(/(<tr>.*<\/tr>\n?)+/gs, m => `<table style="width:100%;border-collapse:collapse;margin:8px 0">${m}</table>`)
+    .replace(/^---$/gm, '<hr style="margin:16px 0;border-color:var(--border)">')
+    .replace(/\n\n/g, '</p><p style="margin:0 0 8px">')
+    .replace(/\n/g, '<br>');
+}
+
+function showAnswer(tax, mdContent, sources) {
   document.getElementById('ansTaxTag').textContent = tax;
   document.getElementById('ansBody').innerHTML = `
-    <div class="ans-section">
-      <div class="ans-section-label">1. 질의 요지</div>
-      <div class="ans-section-body"><p>${answer.issue}</p></div>
+    <div class="ans-section-body" style="font-size:.87rem;line-height:1.8">
+      <p style="margin:0 0 8px">${renderMd(mdContent)}</p>
     </div>
-    <div class="ans-section">
-      <div class="ans-section-label">2. 사실관계 정리</div>
-      <div class="ans-section-body"><p>${answer.facts}</p></div>
-    </div>
-    <div class="ans-section">
-      <div class="ans-section-label">3. 관련 법령 및 판례</div>
-      <table class="ans-table">
-        <thead><tr><th>구분</th><th>명칭</th><th>주요 내용</th></tr></thead>
-        <tbody>${answer.laws.map(l=>`
-          <tr><td>${l.type}</td><td style="font-weight:600">${l.name}</td><td>${l.desc}</td></tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div class="ans-section">
-      <div class="ans-section-label">5. 종합 검토 의견</div>
-      <div class="ans-section-body"><p>${answer.opinion}</p></div>
-    </div>
-    <div class="ans-section">
+    ${sources.length ? `
+    <div class="ans-section" style="margin-top:16px">
       <div class="ans-section-label">근거 자료 출처</div>
-      <div class="source-row">${answer.sources.map(s=>`<span class="source-chip">📄 ${s}</span>`).join('')}</div>
-    </div>
-    <div class="warning-box">
+      <div class="source-row">${sources.map(s=>`<span class="source-chip">📄 ${s}</span>`).join('')}</div>
+    </div>` : ''}
+    <div class="warning-box" style="margin-top:12px">
       ⚠️ 본 답변은 AI가 생성한 참고용 검토 의견이며, 최종 법적 판단의 책임은 담당자에게 있습니다.
     </div>`;
   document.getElementById('answerCard').style.display = 'block';

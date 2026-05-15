@@ -187,34 +187,43 @@ function fillUser(email, pw) {
   document.getElementById('email').value = email;
   document.getElementById('password').value = pw;
 }
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
   const btn = e.target.querySelector('button[type=submit]');
   btn.textContent = '로그인 중...';
   btn.disabled = true;
-  // TODO: 실제 API 연동
-  setTimeout(() => {
-    if (email === 'admin@taxist.kr' && password === 'admin1234') {
+  try {
+    const res  = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('alertBox').textContent = data.error || '로그인에 실패했습니다';
+      document.getElementById('alertBox').style.display = 'block';
+      btn.textContent = '로그인'; btn.disabled = false;
+      return;
+    }
+    localStorage.setItem('taxist_token', data.token);
+    localStorage.setItem('taxist_user', JSON.stringify(data.user));
+    // 하위 호환용
+    if (data.user.role === 'admin') {
       localStorage.setItem('adminAuth', 'true');
-      localStorage.setItem('adminName', '관리자');
+      localStorage.setItem('adminName', data.user.name);
       window.location.href = 'admin/dashboard.html';
-      return;
-    }
-    if (email === 'test@taxist.kr' && password === 'test1234') {
+    } else {
       localStorage.setItem('userAuth', 'true');
-      localStorage.setItem('userName', '김민준');
-      localStorage.setItem('userEmail', 'test@taxist.kr');
-      localStorage.setItem('userOrg', '서울지방국세청 법인세과');
-      localStorage.setItem('userTax', '법인세,부가세');
+      localStorage.setItem('userName', data.user.name);
       window.location.href = 'ask.html';
-      return;
     }
-    btn.textContent = '로그인';
-    btn.disabled = false;
+  } catch (e) {
+    document.getElementById('alertBox').textContent = '서버 연결에 실패했습니다';
     document.getElementById('alertBox').style.display = 'block';
-  }, 1000);
+    btn.textContent = '로그인'; btn.disabled = false;
+  }
 }
 </script>
 </body>
