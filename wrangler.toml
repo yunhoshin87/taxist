@@ -8,4 +8,4 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "taxist-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "f257e814-b8ff-4ba3-a45b-55981035b44a"

@@ -50,7 +50,7 @@ function esc(str) {
 }
 
 function sqlInsert(folderId, name, filePath, content, taxCategory) {
-  const safeContent = esc(content.slice(0, 500000)); // D1 한 행 최대 약 1MB
+  const safeContent = esc(content.slice(0, 50000)); // D1 50KB 제한
   const safeName    = esc(name);
   const safePath    = esc(filePath);
   return `INSERT OR IGNORE INTO documents (folder_id, name, file_path, content, tax_category, is_active) VALUES (${folderId}, '${safeName}', '${safePath}', '${safeContent}', '${taxCategory}', 1);`;
