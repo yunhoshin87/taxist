@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>회원 관리 — TAXIST 관리자</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <style>
+    :root{--coral:#E05B4B;--navy:#1B2B4B;--navy-mid:#2E4370;
+          --bg:#F0F2F5;--bg-card:#FFFFFF;--text:#222831;--text-muted:#6B7280;
+          --border:#E5E7EB;--sidebar:240px;--radius-sm:8px;--radius-md:12px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+         background:var(--bg);color:var(--text);display:flex;min-height:100vh;}
+    a{text-decoration:none;color:inherit}
+    .sidebar{width:var(--sidebar);background:var(--navy);position:fixed;top:0;left:0;
+             height:100vh;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+    .sb-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo a{font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-.04em}
+    .sb-logo a span{color:var(--coral)}
+    .sb-badge{display:inline-block;font-size:.66rem;font-weight:700;padding:2px 8px;
+              border-radius:100px;background:rgba(224,91,75,.25);color:#FFA99D;margin-top:4px}
+    .sb-nav{padding:16px 12px;flex:1}
+    .sb-section{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+                color:rgba(255,255,255,.3);padding:8px 8px 6px;margin-top:8px}
+    .sb-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);
+             font-size:.88rem;font-weight:500;color:rgba(255,255,255,.65);transition:all .15s;margin-bottom:2px}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:rgba(224,91,75,.2);color:#fff;font-weight:700}
+    .sb-item.active .sb-icon{color:var(--coral)}
+    .sb-icon{font-size:1rem;width:20px;text-align:center}
+    .sb-footer{padding:16px;border-top:1px solid rgba(255,255,255,.08)}
+    .sb-user{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .sb-avatar{width:32px;height:32px;border-radius:50%;background:var(--coral);
+               display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff}
+    .sb-uname{font-size:.82rem;font-weight:600;color:#fff}
+    .sb-urole{font-size:.72rem;color:rgba(255,255,255,.45)}
+    .btn-logout{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;
+                border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);
+                font-size:.78rem;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-logout:hover{background:rgba(255,255,255,.08);color:#fff}
+    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
+    .topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;
+            height:60px;display:flex;align-items:center;justify-content:space-between;
+            position:sticky;top:0;z-index:10}
+    .topbar-title{font-size:1rem;font-weight:700;color:var(--navy)}
+    .content{padding:28px;flex:1}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:22px}
+    .card+.card{margin-top:16px}
+    .status{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:100px}
+    .status-green{background:#DCFCE7;color:#166534}
+    .status-orange{background:#FEF9C3;color:#854D0E}
+    .status-red{background:#FEE2E2;color:#991B1B}
+    .status-blue{background:#DBEAFE;color:#1E40AF}
+    /* toolbar */
+    .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border);
+                border-radius:var(--radius-sm);padding:8px 14px;flex:1;min-width:200px}
+    .search-box input{border:none;outline:none;font-size:.88rem;font-family:inherit;
+                      background:transparent;color:var(--text);width:100%}
+    .filter-select{padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                   font-size:.85rem;font-family:inherit;background:#fff;color:var(--text);cursor:pointer}
+    /* table */
+    table{width:100%;border-collapse:collapse}
+    th{font-size:.76rem;font-weight:700;color:var(--text-muted);padding:10px 12px;
+       text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+    td{font-size:.83rem;padding:12px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#FAFAFA}
+    .action-btn{font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:100px;
+                cursor:pointer;border:1px solid;transition:all .15s;background:transparent;font-family:inherit}
+    .action-btn.view{border-color:#C7D7FF;color:#3B5BDB}
+    .action-btn.view:hover{background:#EEF4FF}
+    .action-btn.suspend{border-color:#FCA5A5;color:#DC2626}
+    .action-btn.suspend:hover{background:#FEF2F2}
+    .action-btn.restore{border-color:#86EFAC;color:#16A34A}
+    .action-btn.restore:hover{background:#F0FDF4}
+    .action-btn.extend{border-color:#FDE68A;color:#D97706}
+    .action-btn.extend:hover{background:#FFFBEB}
+    /* summary cards */
+    .sum-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+    .sum-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);
+              padding:16px 18px}
+    .sum-label{font-size:.76rem;color:var(--text-muted);margin-bottom:6px}
+    .sum-val{font-size:1.5rem;font-weight:800;color:var(--navy);letter-spacing:-.03em}
+    /* modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;
+                   display:none;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal{background:#fff;border-radius:var(--radius-md);padding:28px 28px 24px;
+           width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+    .modal h3{font-size:1.1rem;font-weight:700;margin-bottom:16px}
+    .modal-close{float:right;background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted)}
+    .detail-row{display:flex;justify-content:space-between;padding:9px 0;
+                border-bottom:1px solid var(--border);font-size:.85rem}
+    .detail-row:last-child{border-bottom:none}
+    .detail-label{color:var(--text-muted);font-weight:600}
+    .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+    .mbtn{padding:9px 18px;border-radius:var(--radius-sm);font-size:.85rem;font-weight:700;
+          cursor:pointer;font-family:inherit;transition:all .2s;border:none}
+    .mbtn-navy{background:var(--navy);color:#fff}
+    .mbtn-red{background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5}
+    .mbtn-green{background:#DCFCE7;color:#166534;border:1px solid #86EFAC}
+    .mbtn-outline{background:transparent;border:1px solid var(--border);color:var(--text-muted)}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-logo">
+    <a href="../index.html">TAXIST<span>.</span></a>
+    <div class="sb-badge">관리자 패널</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">메인</div>
+    <a href="dashboard.html" class="sb-item"><span class="sb-icon">📊</span> 대시보드</a>
+    <div class="sb-section">관리</div>
+    <a href="members.html" class="sb-item active"><span class="sb-icon">👥</span> 회원 관리</a>
+    <a href="questions.html" class="sb-item"><span class="sb-icon">💬</span> 질문/답변 관리</a>
+    <a href="documents.html" class="sb-item"><span class="sb-icon">📁</span> 자료 폴더 관리</a>
+    <div class="sb-section">분석</div>
+    <a href="members.html#license" class="sb-item"><span class="sb-icon">🎫</span> 이용권 분석</a>
+  </nav>
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">관</div>
+      <div><div class="sb-uname">관리자</div><div class="sb-urole">admin@taxist.kr</div></div>
+    </div>
+    <button class="btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title">회원 관리</span>
+  </div>
+  <div class="content">
+
+    <div class="sum-row" id="sumRow"></div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="이름, 이메일, 소속 검색..." oninput="renderTable()" />
+        </div>
+        <select class="filter-select" id="statusFilter" onchange="renderTable()">
+          <option value="">전체 상태</option>
+          <option value="무료사용중">무료사용중</option>
+          <option value="무료기간만료">무료기간만료</option>
+          <option value="이용정지">이용정지</option>
+        </select>
+        <select class="filter-select" id="taxFilter" onchange="renderTable()">
+          <option value="">전체 세목</option>
+          <option value="법인세">법인세</option>
+          <option value="부가세">부가세</option>
+          <option value="조사">조사</option>
+          <option value="징세">징세</option>
+          <option value="재산세">재산세</option>
+          <option value="개인세">개인세</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>이름</th><th>이메일</th><th>소속</th><th>세목</th>
+            <th>가입일</th><th>무료만료일</th><th>질문수</th><th>상태</th><th>관리</th>
+          </tr>
+        </thead>
+        <tbody id="memberTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 회원 상세 모달 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalBox">
+    <button class="modal-close" onclick="closeModal(null, true)">✕</button>
+    <h3 id="modalTitle">회원 상세</h3>
+    <div id="modalContent"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<script src="_common.js"></script>
+<script>
+requireAdmin();
+
+// Summary
+const s = {active:0, expired:0, suspended:0, total:MEMBERS.length};
+MEMBERS.forEach(m=>{
+  if(m.status==='무료사용중') s.active++;
+  else if(m.status==='무료기간만료') s.expired++;
+  else if(m.status==='이용정지') s.suspended++;
+});
+document.getElementById('sumRow').innerHTML = [
+  {label:'전체 회원', val:s.total, cls:''},
+  {label:'무료 이용중', val:s.active, cls:'color:#166534'},
+  {label:'무료 만료', val:s.expired, cls:'color:#D97706'},
+  {label:'이용 정지', val:s.suspended, cls:'color:#DC2626'},
+].map(x=>`<div class="sum-card"><div class="sum-label">${x.label}</div>
+  <div class="sum-val" style="${x.cls}">${x.val}</div></div>`).join('');
+
+function renderTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const sf = document.getElementById('statusFilter').value;
+  const tf = document.getElementById('taxFilter').value;
+  const filtered = MEMBERS.filter(m=>{
+    const matchQ = !q || m.name.includes(q) || m.email.toLowerCase().includes(q) || m.org.includes(q);
+    const matchS = !sf || m.status === sf;
+    const matchT = !tf || m.tax.includes(tf);
+    return matchQ && matchS && matchT;
+  });
+  document.getElementById('memberTbody').innerHTML = filtered.map(m=>`
+    <tr>
+      <td><strong>${m.name}</strong></td>
+      <td style="color:var(--text-muted)">${m.email}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem;color:var(--text-muted)">${m.org}</td>
+      <td style="font-size:.76rem">${m.tax.join(', ')}</td>
+      <td style="color:var(--text-muted);font-size:.78rem">${m.joinedAt}</td>
+      <td style="font-size:.78rem${m.status==='무료기간만료'?';color:#DC2626;font-weight:700':''}">${m.trialEndsAt}</td>
+      <td style="font-weight:700;text-align:center">${m.questions}</td>
+      <td><span class="status status-${STATUS_COLOR[m.status]}">${STATUS_LABEL[m.status]}</span></td>
+      <td>
+        <button class="action-btn view" onclick="openModal(${m.id})">상세</button>
+        ${m.status==='이용정지'
+          ? `<button class="action-btn restore" onclick="changeStatus(${m.id},'무료사용중')">복구</button>`
+          : `<button class="action-btn suspend" onclick="changeStatus(${m.id},'이용정지')">정지</button>`}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted)">검색 결과 없음</td></tr>';
+}
+renderTable();
+
+function changeStatus(id, newStatus) {
+  const m = MEMBERS.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm(`${m.name} 님을 "${newStatus}"(으)로 변경하시겠습니까?`)) return;
+  m.status = newStatus;
+  renderTable();
+  // 모달이 열려있으면 갱신
+  if(document.getElementById('modalOverlay').classList.contains('open')) openModal(id);
+}
+
+let currentMemberId = null;
+function openModal(id) {
+  currentMemberId = id;
+  const m = MEMBERS.find(x=>x.id===id);
+  document.getElementById('modalTitle').textContent = m.name + ' 님 상세';
+  document.getElementById('modalContent').innerHTML = [
+    ['이메일', m.email],
+    ['소속', m.org],
+    ['담당 세목', m.tax.join(', ')],
+    ['가입일', m.joinedAt],
+    ['무료 만료일', m.trialEndsAt],
+    ['이용 상태', `<span class="status status-${STATUS_COLOR[m.status]}">${m.status}</span>`],
+    ['누적 질문수', m.questions + '건'],
+    ['최근 접속', m.lastLogin],
+  ].map(([l,v])=>`<div class="detail-row"><span class="detail-label">${l}</span><span>${v}</span></div>`).join('');
+  document.getElementById('modalActions').innerHTML = `
+    <button class="mbtn mbtn-navy" onclick="closeModal(null,true)">닫기</button>
+    ${m.status==='이용정지'
+      ? `<button class="mbtn mbtn-green" onclick="changeStatus(${id},'무료사용중')">이용 복구</button>`
+      : `<button class="mbtn mbtn-red" onclick="changeStatus(${id},'이용정지')">이용 정지</button>`}
+    <button class="mbtn" style="background:#FEF9C3;color:#D97706;border:1px solid #FDE68A"
+            onclick="extendTrial(${id})">무료기간 연장</button>`;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(e, force) {
+  if(force || e.target===document.getElementById('modalOverlay'))
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+function extendTrial(id) {
+  const m = MEMBERS.find(x=>x.id===id);
+  const end = new Date(m.trialEndsAt);
+  end.setMonth(end.getMonth()+1);
+  m.trialEndsAt = end.toISOString().split('T')[0];
+  m.status = '무료사용중';
+  alert(`${m.name} 님 무료 기간이 ${m.trialEndsAt}까지 연장되었습니다.`);
+  renderTable();
+  openModal(id);
+}
+</script>
+</body>
+</html>

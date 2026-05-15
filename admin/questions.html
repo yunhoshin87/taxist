@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>질문/답변 관리 — TAXIST 관리자</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <style>
+    :root{--coral:#E05B4B;--navy:#1B2B4B;--navy-mid:#2E4370;
+          --bg:#F0F2F5;--bg-card:#FFFFFF;--text:#222831;--text-muted:#6B7280;
+          --border:#E5E7EB;--sidebar:240px;--radius-sm:8px;--radius-md:12px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+         background:var(--bg);color:var(--text);display:flex;min-height:100vh;}
+    a{text-decoration:none;color:inherit}
+    .sidebar{width:var(--sidebar);background:var(--navy);position:fixed;top:0;left:0;
+             height:100vh;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+    .sb-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo a{font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-.04em}
+    .sb-logo a span{color:var(--coral)}
+    .sb-badge{display:inline-block;font-size:.66rem;font-weight:700;padding:2px 8px;
+              border-radius:100px;background:rgba(224,91,75,.25);color:#FFA99D;margin-top:4px}
+    .sb-nav{padding:16px 12px;flex:1}
+    .sb-section{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+                color:rgba(255,255,255,.3);padding:8px 8px 6px;margin-top:8px}
+    .sb-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);
+             font-size:.88rem;font-weight:500;color:rgba(255,255,255,.65);transition:all .15s;margin-bottom:2px}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:rgba(224,91,75,.2);color:#fff;font-weight:700}
+    .sb-item.active .sb-icon{color:var(--coral)}
+    .sb-icon{font-size:1rem;width:20px;text-align:center}
+    .sb-footer{padding:16px;border-top:1px solid rgba(255,255,255,.08)}
+    .sb-user{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .sb-avatar{width:32px;height:32px;border-radius:50%;background:var(--coral);
+               display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff}
+    .sb-uname{font-size:.82rem;font-weight:600;color:#fff}
+    .sb-urole{font-size:.72rem;color:rgba(255,255,255,.45)}
+    .btn-logout{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;
+                border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);
+                font-size:.78rem;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-logout:hover{background:rgba(255,255,255,.08);color:#fff}
+    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
+    .topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;
+            height:60px;display:flex;align-items:center;position:sticky;top:0;z-index:10}
+    .topbar-title{font-size:1rem;font-weight:700;color:var(--navy)}
+    .content{padding:28px;flex:1}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:22px}
+    .card+.card{margin-top:16px}
+    .status{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:100px}
+    .status-green{background:#DCFCE7;color:#166534}
+    .status-orange{background:#FEF9C3;color:#854D0E}
+    .status-red{background:#FEE2E2;color:#991B1B}
+    .status-blue{background:#DBEAFE;color:#1E40AF}
+    .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border);
+                border-radius:var(--radius-sm);padding:8px 14px;flex:1;min-width:200px}
+    .search-box input{border:none;outline:none;font-size:.88rem;font-family:inherit;
+                      background:transparent;color:var(--text);width:100%}
+    .filter-select{padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                   font-size:.85rem;font-family:inherit;background:#fff;color:var(--text);cursor:pointer}
+    table{width:100%;border-collapse:collapse}
+    th{font-size:.76rem;font-weight:700;color:var(--text-muted);padding:10px 12px;
+       text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+    td{font-size:.83rem;padding:12px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#FAFAFA}
+    .action-btn{font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:100px;
+                cursor:pointer;border:1px solid;transition:all .15s;background:transparent;font-family:inherit}
+    .action-btn.view{border-color:#C7D7FF;color:#3B5BDB}
+    .action-btn.view:hover{background:#EEF4FF}
+    /* 상세 패널 */
+    .detail-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);
+                  padding:24px;display:none}
+    .detail-panel.open{display:block}
+    .dp-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+    .dp-title{font-size:1rem;font-weight:700;color:var(--navy);line-height:1.4;max-width:560px}
+    .dp-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted)}
+    .dp-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+    .dp-meta span{font-size:.78rem;color:var(--text-muted)}
+    .dp-meta strong{color:var(--text)}
+    .dp-section{margin-bottom:16px}
+    .dp-section-title{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+                      color:var(--coral);margin-bottom:8px}
+    .dp-content{background:#F9FAFB;border:1px solid var(--border);border-radius:var(--radius-sm);
+                padding:14px 16px;font-size:.85rem;line-height:1.75;border-left:3px solid var(--coral)}
+    .dp-actions{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+    .dbtn{padding:8px 18px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:700;
+          cursor:pointer;font-family:inherit;border:none;transition:all .2s}
+    .dbtn-navy{background:var(--navy);color:#fff}
+    .dbtn-orange{background:#FEF9C3;color:#D97706;border:1px solid #FDE68A!important}
+    .dbtn-red{background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5!important}
+    .dbtn-outline{background:transparent;border:1px solid var(--border)!important;color:var(--text-muted)}
+    /* tab */
+    .tab-row{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px}
+    .tab{padding:8px 16px;font-size:.85rem;font-weight:600;color:var(--text-muted);cursor:pointer;
+         border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+    .tab.active{color:var(--coral);border-bottom-color:var(--coral)}
+    .tab:hover{color:var(--navy)}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-logo">
+    <a href="../index.html">TAXIST<span>.</span></a>
+    <div class="sb-badge">관리자 패널</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">메인</div>
+    <a href="dashboard.html" class="sb-item"><span class="sb-icon">📊</span> 대시보드</a>
+    <div class="sb-section">관리</div>
+    <a href="members.html" class="sb-item"><span class="sb-icon">👥</span> 회원 관리</a>
+    <a href="questions.html" class="sb-item active"><span class="sb-icon">💬</span> 질문/답변 관리</a>
+    <a href="documents.html" class="sb-item"><span class="sb-icon">📁</span> 자료 폴더 관리</a>
+    <div class="sb-section">분석</div>
+    <a href="members.html#license" class="sb-item"><span class="sb-icon">🎫</span> 이용권 분석</a>
+  </nav>
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">관</div>
+      <div><div class="sb-uname">관리자</div><div class="sb-urole">admin@taxist.kr</div></div>
+    </div>
+    <button class="btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title">질문/답변 관리</span>
+  </div>
+  <div class="content">
+
+    <!-- 질문 목록 -->
+    <div class="card">
+      <div class="tab-row">
+        <div class="tab active" onclick="setTab('all',this)">전체 <span id="cntAll"></span></div>
+        <div class="tab" onclick="setTab('답변완료',this)">답변완료 <span id="cnt답변완료"></span></div>
+        <div class="tab" onclick="setTab('검토필요',this)">검토필요 <span id="cnt검토필요"></span></div>
+        <div class="tab" onclick="setTab('오류신고',this)">오류신고 <span id="cnt오류신고"></span></div>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="qSearch" placeholder="제목, 회원명 검색..." oninput="renderQ()" />
+        </div>
+        <select class="filter-select" id="taxFilter" onchange="renderQ()">
+          <option value="">전체 세목</option>
+          <option>법인세</option><option>부가세</option><option>조사</option>
+          <option>징세</option><option>재산세</option><option>개인세</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>회원</th><th>세목</th><th>제목</th><th>상태</th><th>등록일시</th><th>답변시간</th><th>관리</th></tr></thead>
+        <tbody id="qTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- 상세 패널 -->
+    <div class="detail-panel" id="detailPanel">
+      <div class="dp-header">
+        <div class="dp-title" id="dpTitle"></div>
+        <button class="dp-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="dp-meta" id="dpMeta"></div>
+      <div class="dp-section">
+        <div class="dp-section-title">질문 내용 (요약)</div>
+        <div class="dp-content" id="dpQ"></div>
+      </div>
+      <div class="dp-section">
+        <div class="dp-section-title">AI 답변 (요약)</div>
+        <div class="dp-content" id="dpA"></div>
+      </div>
+      <div class="dp-actions">
+        <button class="dbtn dbtn-navy" onclick="closeDetail()">닫기</button>
+        <button class="dbtn dbtn-orange" id="dpRetryBtn">재답변 요청</button>
+        <button class="dbtn dbtn-red" id="dpErrorBtn">오류 표시</button>
+        <button class="dbtn dbtn-outline" id="dpMemoBtn">내부 메모</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="_common.js"></script>
+<script>
+requireAdmin();
+let activeTab = 'all';
+
+// 탭 카운트
+function updateCounts() {
+  document.getElementById('cntAll').textContent = `(${QUESTIONS.length})`;
+  ['답변완료','검토필요','오류신고'].forEach(s=>{
+    const el = document.getElementById('cnt'+s);
+    if(el) el.textContent = `(${QUESTIONS.filter(q=>q.status===s).length})`;
+  });
+}
+updateCounts();
+
+function setTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderQ();
+}
+
+const Q_ANSWERS = {
+  1:'법인세법 제52조에 따라 부당행위계산 부인 규정 적용 요건은 ① 특수관계인 간 거래, ② 시가보다 낮거나 높은 가액으로 거래, ③ 법인의 소득 감소 또는 조세 부담 경감이 인정되는 경우입니다. 대법원 2021두52631에 따르면 시가 산정은 불특정 다수인 간 정상 거래 가격을 기준으로 합니다.',
+  2:'지방세법 제111조에 따라 공동주택 가격 산정에 이의가 있는 경우 과세기준일로부터 60일 이내에 이의신청이 가능합니다. 시가표준액 조정 시 적용 감면 규정은 지방세특례제한법 제92조에서 확인하시기 바랍니다.',
+  3:'소득세법 제119조 비거주자의 국내원천 양도소득에 대해 양도일이 속하는 달의 말일로부터 2개월 이내에 납세지 관할 세무서에 신고·납부해야 합니다.',
+  4:'부가가치세법 제15조 용역 공급 시기와 제32조 세금계산서 발급 시기가 상이한 경우, 실제 용역이 완료된 날 또는 대가 수령일 중 빠른 날을 공급 시기로 보아야 합니다. 다만 계속 공급 용역의 경우 별도 기준이 적용됩니다.',
+  5:'국세기본법 제81조의5 사전통지 생략 요건: ① 증거인멸 우려, ② 정기 조사 대상, ③ 탈세 제보가 있는 경우입니다. 사전통지 생략 시 조사 개시와 동시에 납세자 권리헌장을 교부해야 합니다.',
+  6:'법인세법 제45조 합병 시 피합병법인의 이월결손금 승계 한도는 피합병법인으로부터 승계한 사업에서 발생한 소득 범위 내로 제한됩니다. 다만 적격합병 요건을 충족하는 경우 전액 승계 가능합니다.',
+  7:'국세징수법 제92조에 따라 압류 재산 공매 시 배당 순위는 ① 강제집행 비용, ② 국세·가산금, ③ 담보권 있는 채권, ④ 일반 채권 순입니다. 다만 근저당권 설정 시기와 국세 납세의무 성립일에 따라 순위가 달라질 수 있습니다.',
+  8:'지방세법 제105조 과세기준일 현재 공부상 현황과 실질 현황이 다른 경우 실질 현황에 따라 과세합니다. 단, 정당한 사유가 있는 경우 납세자가 소명 자료를 제출하면 공부상 현황 적용 가능합니다.',
+  9:'법인세법 제44조 임원 퇴직금 한도 초과액은 손금 불산입 처리하고 귀속 임원에 대한 근로소득 또는 퇴직소득으로 소득 처분합니다.',
+  10:'지방세법 제110조 신축 건물의 시가표준액은 건물신축가격기준액 × 구조 지수 × 용도 지수 × 위치 지수 × 경과연수별 잔가율 × 면적으로 산정합니다.',
+};
+const Q_CONTENTS = {
+  1:'법인이 100% 자회사에 시가 10억원 상당의 주식을 5억원에 양도한 경우, 법인세법상 부당행위계산 부인 규정 적용 여부와 시가 산정 방법을 검토해 주십시오.',
+  2:'2025년 1월 신축된 공동주택의 공시가격이 인근 시세 대비 현저히 높게 산정된 것 같습니다. 이의신청 절차와 감면 가능성을 알고 싶습니다.',
+  3:'미국 국적 비거주자가 국내 소재 아파트를 양도하는 경우의 세금 신고 절차와 세율을 알고 싶습니다.',
+  4:'계약 체결은 3월에, 용역 완료는 5월에 된 경우 세금계산서를 언제 발급해야 하는지 문의드립니다.',
+  5:'납세자가 해외 도피 우려가 있는 경우 세무조사 사전통지를 생략할 수 있는지, 그 요건과 절차를 검토해 주십시오.',
+  6:'A법인이 B법인을 흡수합병하는 경우 B법인의 이월결손금 20억원을 전액 승계할 수 있는지 검토해 주십시오.',
+  7:'체납자 소유 부동산 공매 시 근저당권자와 압류 국세 중 누가 우선 배당받는지 검토해 주십시오.',
+  8:'공부상 창고로 등록되어 있으나 실제로는 주거용으로 사용되는 건물에 대한 재산세 과세 방법을 문의합니다.',
+  9:'임원 퇴직 시 정관에서 정한 퇴직금이 세법상 한도를 초과하는 경우 처리 방법을 알고 싶습니다.',
+  10:'2025년 3월 신축 완공된 건물의 재산세 과세표준 및 세율 적용 방법을 알려주십시오.',
+};
+
+function renderQ() {
+  const q = document.getElementById('qSearch').value.toLowerCase();
+  const tf = document.getElementById('taxFilter').value;
+  const filtered = QUESTIONS.filter(item=>{
+    const matchTab = activeTab==='all' || item.status===activeTab;
+    const matchQ = !q || item.title.toLowerCase().includes(q) || item.userName.includes(q);
+    const matchT = !tf || item.taxCategory===tf;
+    return matchTab && matchQ && matchT;
+  });
+  document.getElementById('qTbody').innerHTML = filtered.map(item=>`
+    <tr>
+      <td style="color:var(--text-muted);font-size:.76rem">${item.id}</td>
+      <td style="font-weight:600">${item.userName}</td>
+      <td><span class="status status-blue">${item.taxCategory}</span></td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</td>
+      <td><span class="status status-${Q_STATUS_COLOR[item.status]}">${item.status}</span></td>
+      <td style="color:var(--text-muted);font-size:.78rem;white-space:nowrap">${item.createdAt}</td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${item.answerTime}</td>
+      <td><button class="action-btn view" onclick="openDetail(${item.id})">상세</button></td>
+    </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">결과 없음</td></tr>';
+}
+renderQ();
+
+function openDetail(id) {
+  const q = QUESTIONS.find(x=>x.id===id);
+  document.getElementById('dpTitle').textContent = q.title;
+  document.getElementById('dpMeta').innerHTML = `
+    <span>회원: <strong>${q.userName}</strong></span>
+    <span>세목: <strong>${q.taxCategory}</strong></span>
+    <span>등록: <strong>${q.createdAt}</strong></span>
+    <span>답변시간: <strong>${q.answerTime}</strong></span>
+    <span>상태: <span class="status status-${Q_STATUS_COLOR[q.status]}">${q.status}</span></span>`;
+  document.getElementById('dpQ').textContent = Q_CONTENTS[id] || '(질문 내용)';
+  document.getElementById('dpA').textContent = Q_ANSWERS[id] || '(답변 내용)';
+  document.getElementById('dpRetryBtn').onclick = () => { alert('재답변 요청이 등록되었습니다.'); q.status='재답변완료'; renderQ(); };
+  document.getElementById('dpErrorBtn').onclick = () => { q.status='오류신고'; alert('오류가 표시되었습니다.'); renderQ(); openDetail(id); };
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('detailPanel').scrollIntoView({behavior:'smooth'});
+}
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+}
+</script>
+</body>
+</html>

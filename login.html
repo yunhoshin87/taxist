@@ -175,6 +175,12 @@ function handleLogin(e) {
   btn.disabled = true;
   // TODO: 실제 API 연동
   setTimeout(() => {
+    if (email === 'admin@taxist.kr' && password === 'admin1234') {
+      localStorage.setItem('adminAuth', 'true');
+      localStorage.setItem('adminName', '관리자');
+      window.location.href = 'admin/dashboard.html';
+      return;
+    }
     btn.textContent = '로그인';
     btn.disabled = false;
     document.getElementById('alertBox').style.display = 'block';

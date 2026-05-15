@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 로그인 — TAXIST</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <style>
+    :root {
+      --coral:#E05B4B; --coral-dark:#C24636;
+      --navy:#1B2B4B; --navy-mid:#2E4370;
+      --bg:#F7F5F2; --border:#E5E7EB;
+      --text:#222831; --text-muted:#6B7280;
+      --radius-sm:8px; --radius-md:16px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+         background:var(--bg);color:var(--text);min-height:100vh;
+         display:flex;align-items:center;justify-content:center;}
+    a{text-decoration:none;color:inherit}
+
+    .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-md);
+          padding:48px 44px;width:100%;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+    .logo{font-size:1.4rem;font-weight:800;color:var(--navy);letter-spacing:-.04em;
+          display:block;margin-bottom:6px}
+    .logo span{color:var(--coral)}
+    .admin-badge{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 10px;
+                 border-radius:100px;background:var(--navy);color:#fff;margin-bottom:28px}
+    h1{font-size:1.5rem;font-weight:800;margin-bottom:6px;letter-spacing:-.02em}
+    .sub{font-size:.85rem;color:var(--text-muted);margin-bottom:28px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:.8rem;font-weight:600;color:var(--navy);margin-bottom:6px}
+    .form-group input{width:100%;padding:12px 14px;border:1.5px solid var(--border);
+                      border-radius:var(--radius-sm);font-size:.9rem;font-family:inherit;
+                      background:var(--bg);transition:border-color .2s,box-shadow .2s}
+    .form-group input:focus{outline:none;border-color:var(--coral);
+                             box-shadow:0 0 0 3px rgba(224,91,75,.12);background:#fff}
+    .btn{width:100%;padding:13px;border-radius:var(--radius-sm);background:var(--navy);
+         color:#fff;font-size:.95rem;font-weight:700;font-family:inherit;cursor:pointer;
+         border:none;transition:all .2s;margin-top:8px}
+    .btn:hover{background:var(--navy-mid);transform:translateY(-1px)}
+    .alert{padding:11px 14px;border-radius:var(--radius-sm);font-size:.82rem;
+           margin-bottom:16px;display:none;background:#FEF2F2;
+           border:1px solid #FECACA;color:#991B1B}
+    .hint-box{background:#F0F4FF;border:1px solid #C7D7FF;border-radius:var(--radius-sm);
+              padding:12px 14px;font-size:.78rem;color:#3B5BDB;margin-top:20px;line-height:1.6}
+    .back{text-align:center;margin-top:20px;font-size:.82rem;color:var(--text-muted)}
+    .back a{color:var(--coral);font-weight:600}
+  </style>
+</head>
+<body>
+<div class="card">
+  <a href="../index.html" class="logo">TAXIST<span>.</span></a>
+  <span class="admin-badge">관리자 전용</span>
+  <h1>관리자 로그인</h1>
+  <p class="sub">관리자 계정으로 로그인하세요.</p>
+
+  <div class="alert" id="alertBox">이메일 또는 비밀번호가 올바르지 않습니다.</div>
+
+  <form onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label>이메일</label>
+      <input type="email" id="email" placeholder="admin@taxist.kr" required />
+    </div>
+    <div class="form-group">
+      <label>비밀번호</label>
+      <input type="password" id="pw" placeholder="비밀번호 입력" required />
+    </div>
+    <button type="submit" class="btn" id="loginBtn">로그인</button>
+  </form>
+
+  <div class="hint-box">
+    테스트 계정<br>
+    이메일: <strong>admin@taxist.kr</strong><br>
+    비밀번호: <strong>admin1234</strong>
+  </div>
+
+  <p class="back"><a href="../index.html">← 홈으로 돌아가기</a></p>
+</div>
+
+<script>
+function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const pw = document.getElementById('pw').value;
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = '로그인 중...'; btn.disabled = true;
+  setTimeout(() => {
+    if (email === 'admin@taxist.kr' && pw === 'admin1234') {
+      localStorage.setItem('adminAuth', 'true');
+      localStorage.setItem('adminName', '관리자');
+      window.location.href = 'dashboard.html';
+    } else {
+      document.getElementById('alertBox').style.display = 'block';
+      btn.textContent = '로그인'; btn.disabled = false;
+    }
+  }, 700);
+}
+if (localStorage.getItem('adminAuth') === 'true') {
+  window.location.href = 'dashboard.html';
+}
+</script>
+</body>
+</html>

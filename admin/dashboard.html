@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대시보드 — TAXIST 관리자</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <style>
+    :root{--coral:#E05B4B;--coral-dark:#C24636;--navy:#1B2B4B;--navy-mid:#2E4370;
+          --bg:#F0F2F5;--bg-card:#FFFFFF;--text:#222831;--text-muted:#6B7280;
+          --border:#E5E7EB;--sidebar:240px;--radius-sm:8px;--radius-md:12px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+         background:var(--bg);color:var(--text);display:flex;min-height:100vh;}
+    a{text-decoration:none;color:inherit}
+
+    /* SIDEBAR */
+    .sidebar{width:var(--sidebar);background:var(--navy);position:fixed;top:0;left:0;
+             height:100vh;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+    .sb-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo a{font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-.04em}
+    .sb-logo a span{color:var(--coral)}
+    .sb-badge{display:inline-block;font-size:.66rem;font-weight:700;padding:2px 8px;
+              border-radius:100px;background:rgba(224,91,75,.25);color:#FFA99D;
+              margin-top:4px}
+    .sb-nav{padding:16px 12px;flex:1}
+    .sb-section{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+                color:rgba(255,255,255,.3);padding:8px 8px 6px;margin-top:8px}
+    .sb-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);
+             font-size:.88rem;font-weight:500;color:rgba(255,255,255,.65);transition:all .15s;
+             margin-bottom:2px;cursor:pointer}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:rgba(224,91,75,.2);color:#fff;font-weight:700}
+    .sb-item.active .sb-icon{color:var(--coral)}
+    .sb-icon{font-size:1rem;width:20px;text-align:center}
+    .sb-footer{padding:16px;border-top:1px solid rgba(255,255,255,.08)}
+    .sb-user{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .sb-avatar{width:32px;height:32px;border-radius:50%;background:var(--coral);
+               display:flex;align-items:center;justify-content:center;font-size:.8rem;
+               font-weight:700;color:#fff;flex-shrink:0}
+    .sb-uname{font-size:.82rem;font-weight:600;color:#fff}
+    .sb-urole{font-size:.72rem;color:rgba(255,255,255,.45)}
+    .btn-logout{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;
+                border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);
+                font-size:.78rem;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-logout:hover{background:rgba(255,255,255,.08);color:#fff}
+
+    /* MAIN */
+    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+    .topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;
+            height:60px;display:flex;align-items:center;justify-content:space-between;
+            position:sticky;top:0;z-index:10}
+    .topbar-title{font-size:1rem;font-weight:700;color:var(--navy)}
+    .topbar-right{display:flex;align-items:center;gap:12px}
+    .topbar-date{font-size:.8rem;color:var(--text-muted)}
+    .content{padding:28px;flex:1}
+
+    /* STAT CARDS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);
+               padding:20px 22px}
+    .stat-label{font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px}
+    .stat-val{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;color:var(--navy)}
+    .stat-sub{font-size:.75rem;color:var(--text-muted);margin-top:4px}
+    .stat-badge{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;
+                border-radius:100px;margin-top:6px}
+    .badge-green{background:#DCFCE7;color:#166534}
+    .badge-orange{background:#FEF9C3;color:#854D0E}
+    .badge-red{background:#FEE2E2;color:#991B1B}
+    .badge-blue{background:#DBEAFE;color:#1E40AF}
+
+    /* GRID */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+    .grid-3{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px 22px}
+    .card-title{font-size:.9rem;font-weight:700;color:var(--navy);margin-bottom:16px;
+                display:flex;align-items:center;justify-content:space-between}
+    .card-title a{font-size:.76rem;font-weight:600;color:var(--coral)}
+
+    /* BAR CHART */
+    .bar-list{display:flex;flex-direction:column;gap:10px}
+    .bar-item{display:flex;align-items:center;gap:10px}
+    .bar-label{font-size:.8rem;font-weight:600;color:var(--text);width:60px;flex-shrink:0}
+    .bar-track{flex:1;background:var(--bg);border-radius:100px;height:8px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:100px;transition:width .6s ease}
+    .bar-count{font-size:.78rem;font-weight:700;color:var(--text-muted);width:28px;text-align:right}
+
+    /* TABLE */
+    table{width:100%;border-collapse:collapse}
+    th{font-size:.76rem;font-weight:700;color:var(--text-muted);padding:8px 12px;
+       text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+    td{font-size:.82rem;padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#FAFAFA}
+
+    /* STATUS */
+    .status{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:100px}
+    .status-green{background:#DCFCE7;color:#166534}
+    .status-orange{background:#FEF9C3;color:#854D0E}
+    .status-red{background:#FEE2E2;color:#991B1B}
+    .status-blue{background:#DBEAFE;color:#1E40AF}
+
+    /* EXPIRING LIST */
+    .exp-item{display:flex;align-items:center;justify-content:space-between;
+              padding:10px 0;border-bottom:1px solid var(--border)}
+    .exp-item:last-child{border-bottom:none}
+    .exp-name{font-size:.85rem;font-weight:600}
+    .exp-org{font-size:.74rem;color:var(--text-muted)}
+    .exp-days{font-size:.78rem;font-weight:700;color:var(--coral)}
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <a href="../index.html">TAXIST<span>.</span></a>
+    <div class="sb-badge">관리자 패널</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">메인</div>
+    <a href="dashboard.html" class="sb-item active">
+      <span class="sb-icon">📊</span> 대시보드
+    </a>
+    <div class="sb-section">관리</div>
+    <a href="members.html" class="sb-item">
+      <span class="sb-icon">👥</span> 회원 관리
+    </a>
+    <a href="questions.html" class="sb-item">
+      <span class="sb-icon">💬</span> 질문/답변 관리
+    </a>
+    <a href="documents.html" class="sb-item">
+      <span class="sb-icon">📁</span> 자료 폴더 관리
+    </a>
+    <div class="sb-section">분석</div>
+    <a href="members.html#license" class="sb-item">
+      <span class="sb-icon">🎫</span> 이용권 분석
+    </a>
+  </nav>
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">관</div>
+      <div>
+        <div class="sb-uname" id="adminName">관리자</div>
+        <div class="sb-urole">admin@taxist.kr</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title">대시보드</span>
+    <div class="topbar-right">
+      <span class="topbar-date" id="todayDate"></span>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- STAT CARDS -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="grid-3">
+      <!-- 세목별 질문 현황 -->
+      <div class="card">
+        <div class="card-title">
+          세목별 질문 현황
+          <a href="questions.html">전체 보기 →</a>
+        </div>
+        <div class="bar-list" id="barList"></div>
+      </div>
+
+      <!-- 무료기간 만료 예정 -->
+      <div class="card">
+        <div class="card-title">
+          만료 예정 회원
+          <a href="members.html">전체 보기 →</a>
+        </div>
+        <div id="expiringList"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- 최근 질문 -->
+      <div class="card">
+        <div class="card-title">
+          최근 질문
+          <a href="questions.html">전체 보기 →</a>
+        </div>
+        <table id="recentQ"></table>
+      </div>
+
+      <!-- 회원 현황 -->
+      <div class="card">
+        <div class="card-title">
+          회원 현황
+          <a href="members.html">전체 보기 →</a>
+        </div>
+        <table id="memberTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="_common.js"></script>
+<script>
+requireAdmin();
+document.getElementById('adminName').textContent = localStorage.getItem('adminName') || '관리자';
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+// Stats
+const activeCount = MEMBERS.filter(m=>m.status==='무료사용중').length;
+const expiredCount = MEMBERS.filter(m=>m.status==='무료기간만료').length;
+const totalQ = QUESTIONS.length;
+const doneQ = QUESTIONS.filter(q=>q.status==='답변완료').length;
+const statsData = [
+  {label:'전체 회원', val:MEMBERS.length, sub:'누적 가입자', badge:'', badgeClass:''},
+  {label:'이용중', val:activeCount, sub:'무료 사용 중', badge:'활성', badgeClass:'badge-green'},
+  {label:'만료/정지', val:expiredCount + MEMBERS.filter(m=>m.status==='이용정지').length, sub:'전환 필요', badge:'관리 필요', badgeClass:'badge-orange'},
+  {label:'총 질문', val:totalQ, sub:`답변완료 ${doneQ}건`, badge:`${Math.round(doneQ/totalQ*100)}%`, badgeClass:'badge-blue'},
+];
+document.getElementById('statsRow').innerHTML = statsData.map(s=>`
+  <div class="stat-card">
+    <div class="stat-label">${s.label}</div>
+    <div class="stat-val">${s.val}</div>
+    <div class="stat-sub">${s.sub}</div>
+    ${s.badge ? `<span class="stat-badge ${s.badgeClass}">${s.badge}</span>` : ''}
+  </div>`).join('');
+
+// Bar chart by tax category
+const catMap = {'법인세':0,'부가세':0,'조사':0,'징세':0,'재산세':0,'개인세':0};
+QUESTIONS.forEach(q=>{ if(catMap[q.taxCategory]!==undefined) catMap[q.taxCategory]++; });
+const maxCat = Math.max(...Object.values(catMap));
+const catColors = {'법인세':'#3B5BDB','부가세':'#0CA678','조사':'#F76707','징세':'#E64980','재산세':'#7048E8','개인세':'#1098AD'};
+document.getElementById('barList').innerHTML = Object.entries(catMap).map(([k,v])=>`
+  <div class="bar-item">
+    <div class="bar-label">${k}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${maxCat?v/maxCat*100:0}%;background:${catColors[k]}"></div></div>
+    <div class="bar-count">${v}</div>
+  </div>`).join('');
+
+// Expiring members (within 30 days)
+const today = new Date('2025-05-15');
+const expiring = MEMBERS.filter(m=>m.status==='무료사용중').map(m=>{
+  const end = new Date(m.trialEndsAt);
+  const days = Math.ceil((end-today)/(1000*60*60*24));
+  return {...m, daysLeft:days};
+}).filter(m=>m.daysLeft<=14).sort((a,b)=>a.daysLeft-b.daysLeft);
+document.getElementById('expiringList').innerHTML = expiring.length
+  ? expiring.map(m=>`
+    <div class="exp-item">
+      <div>
+        <div class="exp-name">${m.name}</div>
+        <div class="exp-org">${m.org}</div>
+      </div>
+      <div class="exp-days">${m.daysLeft}일 후</div>
+    </div>`).join('')
+  : '<p style="font-size:.83rem;color:var(--text-muted);text-align:center;padding:20px 0">만료 예정 회원 없음</p>';
+
+// Recent questions
+document.getElementById('recentQ').innerHTML = `
+  <thead><tr><th>회원</th><th>세목</th><th>제목</th><th>상태</th></tr></thead>
+  <tbody>${QUESTIONS.slice(0,5).map(q=>`
+  <tr>
+    <td>${q.userName}</td>
+    <td><span class="status status-blue">${q.taxCategory}</span></td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.title}</td>
+    <td><span class="status status-${Q_STATUS_COLOR[q.status]}">${q.status}</span></td>
+  </tr>`).join('')}</tbody>`;
+
+// Member table
+document.getElementById('memberTable').innerHTML = `
+  <thead><tr><th>이름</th><th>세목</th><th>질문수</th><th>상태</th></tr></thead>
+  <tbody>${MEMBERS.slice(0,6).map(m=>`
+  <tr>
+    <td>${m.name}</td>
+    <td style="font-size:.76rem;color:var(--text-muted)">${m.tax.join(', ')}</td>
+    <td style="font-weight:700">${m.questions}</td>
+    <td><span class="status status-${STATUS_COLOR[m.status]}">${STATUS_LABEL[m.status]}</span></td>
+  </tr>`).join('')}</tbody>`;
+</script>
+</body>
+</html>

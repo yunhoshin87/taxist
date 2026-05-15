@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>자료 폴더 관리 — TAXIST 관리자</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <style>
+    :root{--coral:#E05B4B;--navy:#1B2B4B;--navy-mid:#2E4370;
+          --bg:#F0F2F5;--bg-card:#FFFFFF;--text:#222831;--text-muted:#6B7280;
+          --border:#E5E7EB;--sidebar:240px;--radius-sm:8px;--radius-md:12px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+         background:var(--bg);color:var(--text);display:flex;min-height:100vh;}
+    a{text-decoration:none;color:inherit}
+    .sidebar{width:var(--sidebar);background:var(--navy);position:fixed;top:0;left:0;
+             height:100vh;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+    .sb-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo a{font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-.04em}
+    .sb-logo a span{color:var(--coral)}
+    .sb-badge{display:inline-block;font-size:.66rem;font-weight:700;padding:2px 8px;
+              border-radius:100px;background:rgba(224,91,75,.25);color:#FFA99D;margin-top:4px}
+    .sb-nav{padding:16px 12px;flex:1}
+    .sb-section{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+                color:rgba(255,255,255,.3);padding:8px 8px 6px;margin-top:8px}
+    .sb-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);
+             font-size:.88rem;font-weight:500;color:rgba(255,255,255,.65);transition:all .15s;margin-bottom:2px}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:rgba(224,91,75,.2);color:#fff;font-weight:700}
+    .sb-item.active .sb-icon{color:var(--coral)}
+    .sb-icon{font-size:1rem;width:20px;text-align:center}
+    .sb-footer{padding:16px;border-top:1px solid rgba(255,255,255,.08)}
+    .sb-user{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .sb-avatar{width:32px;height:32px;border-radius:50%;background:var(--coral);
+               display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff}
+    .sb-uname{font-size:.82rem;font-weight:600;color:#fff}
+    .sb-urole{font-size:.72rem;color:rgba(255,255,255,.45)}
+    .btn-logout{width:100%;padding:8px;border-radius:var(--radius-sm);background:transparent;
+                border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);
+                font-size:.78rem;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-logout:hover{background:rgba(255,255,255,.08);color:#fff}
+    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
+    .topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;
+            height:60px;display:flex;align-items:center;position:sticky;top:0;z-index:10}
+    .topbar-title{font-size:1rem;font-weight:700;color:var(--navy)}
+    .content{padding:28px;flex:1}
+
+    /* layout */
+    .doc-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:18px}
+    .card-title{font-size:.88rem;font-weight:700;color:var(--navy);margin-bottom:14px;
+                display:flex;align-items:center;justify-content:space-between}
+    .btn-sm{padding:5px 12px;border-radius:var(--radius-sm);font-size:.76rem;font-weight:700;
+            cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+    .btn-coral{background:var(--coral);color:#fff}
+    .btn-coral:hover{background:#C24636}
+    .btn-navy{background:var(--navy);color:#fff}
+    .btn-navy:hover{background:var(--navy-mid)}
+    .btn-outline{background:transparent;border:1.5px solid var(--border)!important;color:var(--text-muted)}
+    .btn-outline:hover{border-color:var(--navy)!important;color:var(--navy)}
+
+    /* folder tree */
+    .folder-list{display:flex;flex-direction:column;gap:4px}
+    .folder-item{border-radius:var(--radius-sm);overflow:hidden}
+    .folder-header{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;
+                   transition:background .15s;border-radius:var(--radius-sm)}
+    .folder-header:hover{background:var(--bg)}
+    .folder-header.active{background:#F0F4FF}
+    .folder-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .folder-name{font-size:.88rem;font-weight:700;flex:1}
+    .folder-count{font-size:.72rem;color:var(--text-muted)}
+    .folder-arrow{font-size:.8rem;color:var(--text-muted);transition:transform .2s}
+    .folder-arrow.open{transform:rotate(90deg)}
+    .subfolder-list{padding:4px 0 4px 22px;display:none}
+    .subfolder-list.open{display:block}
+    .subfolder-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);
+                    cursor:pointer;transition:background .15s;font-size:.83rem}
+    .subfolder-item:hover{background:var(--bg)}
+    .subfolder-item.active{background:#FFF0EE;color:var(--coral);font-weight:600}
+
+    /* file list */
+    .file-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+    .file-row:last-child{border-bottom:none}
+    .file-icon{font-size:1.4rem;flex-shrink:0}
+    .file-name{font-size:.88rem;font-weight:600;flex:1;color:var(--text)}
+    .file-meta{font-size:.74rem;color:var(--text-muted);margin-top:3px}
+    .file-badges{display:flex;gap:6px;margin-top:4px}
+    .fbadge{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:100px}
+    .fbadge-green{background:#DCFCE7;color:#166534}
+    .fbadge-gray{background:#F3F4F6;color:#6B7280}
+    .fbadge-orange{background:#FEF9C3;color:#854D0E}
+    .file-actions{display:flex;gap:6px;flex-shrink:0}
+    .fbtn{font-size:.72rem;font-weight:600;padding:4px 9px;border-radius:100px;
+          cursor:pointer;border:1px solid;background:transparent;font-family:inherit;transition:all .15s}
+    .fbtn-blue{border-color:#C7D7FF;color:#3B5BDB}
+    .fbtn-blue:hover{background:#EEF4FF}
+    .fbtn-red{border-color:#FCA5A5;color:#DC2626}
+    .fbtn-red:hover{background:#FEF2F2}
+
+    /* upload area */
+    .upload-zone{border:2px dashed var(--border);border-radius:var(--radius-md);
+                 padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+    .upload-zone:hover,.upload-zone.drag{border-color:var(--coral);background:#FFF0EE}
+    .upload-zone p{font-size:.85rem;color:var(--text-muted);margin-top:10px}
+    .upload-zone small{font-size:.76rem;color:var(--text-muted)}
+    input[type=file]{display:none}
+
+    .breadcrumb{font-size:.8rem;color:var(--text-muted);margin-bottom:14px}
+    .breadcrumb strong{color:var(--navy)}
+    .empty-state{text-align:center;padding:40px;color:var(--text-muted);font-size:.85rem}
+    .toggle-switch{position:relative;display:inline-block;width:36px;height:20px}
+    .toggle-switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;inset:0;background:#CBD5E1;border-radius:100px;transition:.3s}
+    .slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;
+                   background:white;border-radius:50%;transition:.3s}
+    input:checked+.slider{background:var(--coral)}
+    input:checked+.slider:before{transform:translateX(16px)}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-logo">
+    <a href="../index.html">TAXIST<span>.</span></a>
+    <div class="sb-badge">관리자 패널</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">메인</div>
+    <a href="dashboard.html" class="sb-item"><span class="sb-icon">📊</span> 대시보드</a>
+    <div class="sb-section">관리</div>
+    <a href="members.html" class="sb-item"><span class="sb-icon">👥</span> 회원 관리</a>
+    <a href="questions.html" class="sb-item"><span class="sb-icon">💬</span> 질문/답변 관리</a>
+    <a href="documents.html" class="sb-item active"><span class="sb-icon">📁</span> 자료 폴더 관리</a>
+    <div class="sb-section">분석</div>
+    <a href="members.html#license" class="sb-item"><span class="sb-icon">🎫</span> 이용권 분석</a>
+  </nav>
+  <div class="sb-footer">
+    <div class="sb-user">
+      <div class="sb-avatar">관</div>
+      <div><div class="sb-uname">관리자</div><div class="sb-urole">admin@taxist.kr</div></div>
+    </div>
+    <button class="btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title">자료 폴더 관리</span>
+  </div>
+  <div class="content">
+    <div class="doc-layout">
+
+      <!-- 폴더 트리 -->
+      <div class="card">
+        <div class="card-title">
+          폴더 구조
+          <button class="btn-sm btn-coral" onclick="alert('폴더 생성 기능은 백엔드 연동 후 활성화됩니다.')">+ 폴더</button>
+        </div>
+        <div class="folder-list" id="folderTree"></div>
+      </div>
+
+      <!-- 파일 목록 -->
+      <div class="card">
+        <div class="card-title">
+          <span id="panelTitle">세목을 선택하세요</span>
+          <button class="btn-sm btn-navy" onclick="document.getElementById('fileInput').click()">📤 MD 업로드</button>
+          <input type="file" id="fileInput" accept=".md" onchange="handleUpload(event)" />
+        </div>
+        <div class="breadcrumb" id="breadcrumb"></div>
+
+        <!-- 업로드 가이드 (초기) -->
+        <div id="uploadGuide">
+          <div class="upload-zone" id="uploadZone"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="handleDrop(event)"
+               onclick="document.getElementById('fileInput').click()">
+            <div style="font-size:2.5rem">📄</div>
+            <p>MD 파일을 여기에 드래그하거나 클릭하여 업로드</p>
+            <small>Markdown (.md) 파일만 지원 · 최대 10MB</small>
+          </div>
+        </div>
+
+        <div id="fileList"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="_common.js"></script>
+<script>
+requireAdmin();
+
+let selectedFolderId = null;
+let selectedSubFolderId = null;
+
+// 폴더 트리 렌더링
+function renderTree() {
+  document.getElementById('folderTree').innerHTML = FOLDERS.map(f=>`
+    <div class="folder-item">
+      <div class="folder-header ${selectedFolderId===f.id&&!selectedSubFolderId?'active':''}"
+           id="fh${f.id}" onclick="toggleFolder(${f.id})">
+        <div class="folder-dot" style="background:${f.color}"></div>
+        <span class="folder-name">${f.name}</span>
+        <span class="folder-count">${f.children.reduce((a,c)=>a+c.files.length,0)}개</span>
+        <span class="folder-arrow ${selectedFolderId===f.id?'open':''}" id="fa${f.id}">▶</span>
+      </div>
+      <div class="subfolder-list ${selectedFolderId===f.id?'open':''}" id="sf${f.id}">
+        ${f.children.map(sub=>`
+          <div class="subfolder-item ${selectedSubFolderId===sub.id?'active':''}"
+               onclick="selectSubfolder(${f.id},${sub.id})">
+            📂 ${sub.name} <span style="margin-left:auto;font-size:.72rem;color:var(--text-muted)">${sub.files.length}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function toggleFolder(fid) {
+  if(selectedFolderId===fid && !selectedSubFolderId) {
+    selectedFolderId = null;
+  } else {
+    selectedFolderId = fid;
+    selectedSubFolderId = null;
+    renderFileList(fid, null);
+  }
+  renderTree();
+}
+
+function selectSubfolder(fid, sfid) {
+  selectedFolderId = fid;
+  selectedSubFolderId = sfid;
+  renderTree();
+  renderFileList(fid, sfid);
+}
+
+function renderFileList(fid, sfid) {
+  const folder = FOLDERS.find(f=>f.id===fid);
+  if(!folder) return;
+
+  let files = [];
+  let subtitle = folder.name;
+  if(sfid) {
+    const sub = folder.children.find(c=>c.id===sfid);
+    files = sub ? sub.files : [];
+    subtitle = `${folder.name} / ${sub?.name || ''}`;
+  } else {
+    folder.children.forEach(c=>files.push(...c.files.map(f=>({...f, subName:c.name}))));
+  }
+
+  document.getElementById('panelTitle').textContent = subtitle;
+  document.getElementById('breadcrumb').innerHTML = sfid
+    ? `<span>자료</span> / <strong>${folder.name}</strong> / <strong>${folder.children.find(c=>c.id===sfid)?.name}</strong>`
+    : `<span>자료</span> / <strong>${folder.name}</strong>`;
+  document.getElementById('uploadGuide').style.display = 'none';
+
+  document.getElementById('fileList').innerHTML = files.length
+    ? files.map(f=>`
+      <div class="file-row">
+        <div class="file-icon">📄</div>
+        <div style="flex:1">
+          <div class="file-name">${f.name}</div>
+          <div class="file-meta">${f.size} · 수정일 ${f.updatedAt}${f.subName?` · 📂 ${f.subName}`:''}</div>
+          <div class="file-badges">
+            ${f.indexed?'<span class="fbadge fbadge-green">색인완료</span>':'<span class="fbadge fbadge-orange">색인대기</span>'}
+            ${f.active?'<span class="fbadge fbadge-green">답변사용중</span>':'<span class="fbadge fbadge-gray">비활성</span>'}
+          </div>
+        </div>
+        <div class="file-actions">
+          <label class="toggle-switch" title="답변에 사용 여부">
+            <input type="checkbox" ${f.active?'checked':''} onchange="toggleFile(${f.id},this.checked)" />
+            <span class="slider"></span>
+          </label>
+          <button class="fbtn fbtn-blue" onclick="alert('색인 재생성 요청이 등록되었습니다.')">색인 갱신</button>
+          <button class="fbtn fbtn-red" onclick="deleteFile(${f.id})">삭제</button>
+        </div>
+      </div>`).join('')
+    : '<div class="empty-state">📂 이 폴더에 파일이 없습니다.<br>MD 파일을 업로드하세요.</div>';
+}
+
+function toggleFile(fileId, active) {
+  FOLDERS.forEach(f=>f.children.forEach(c=>c.files.forEach(file=>{
+    if(file.id===fileId) file.active = active;
+  })));
+  renderFileList(selectedFolderId, selectedSubFolderId);
+}
+
+function deleteFile(fileId) {
+  if(!confirm('이 파일을 삭제하시겠습니까? 복구할 수 없습니다.')) return;
+  FOLDERS.forEach(f=>f.children.forEach(c=>{
+    c.files = c.files.filter(file=>file.id!==fileId);
+  }));
+  renderFileList(selectedFolderId, selectedSubFolderId);
+  renderTree();
+}
+
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!file.name.endsWith('.md')) { alert('.md 파일만 업로드 가능합니다.'); return; }
+  if(!selectedFolderId) { alert('먼저 폴더를 선택해주세요.'); return; }
+  const folder = FOLDERS.find(f=>f.id===selectedFolderId);
+  const target = selectedSubFolderId
+    ? folder.children.find(c=>c.id===selectedSubFolderId)
+    : folder.children[0];
+  if(!target) { alert('서브폴더를 선택해주세요.'); return; }
+  const newFile = {
+    id: Date.now(), name: file.name,
+    size: (file.size/1024).toFixed(0)+'KB',
+    indexed: false, active: true,
+    updatedAt: new Date().toISOString().split('T')[0],
+  };
+  target.files.push(newFile);
+  alert(`"${file.name}" 업로드 완료! 색인 생성 중...`);
+  setTimeout(()=>{ newFile.indexed=true; renderFileList(selectedFolderId, selectedSubFolderId); }, 1500);
+  renderFileList(selectedFolderId, selectedSubFolderId);
+  renderTree();
+  e.target.value='';
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file) { document.getElementById('fileInput').files = e.dataTransfer.files; handleUpload({target:{files:e.dataTransfer.files}}); }
+}
+
+renderTree();
+</script>
+</body>
+</html>
