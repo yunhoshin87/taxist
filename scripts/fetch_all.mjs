@@ -159,11 +159,12 @@ function circleNum(n) {
   return (i >= 0 && i < c.length) ? c[i] : `(${n})`;
 }
 
-// API 응답값이 문자열이 아닐 수 있으므로 안전하게 문자열 변환
+// API 응답값을 안전하게 문자열로 변환 (리스트·딕셔너리 포함)
 function str(v) {
   if (v == null) return "";
   if (typeof v === "string") return v.trim();
-  if (typeof v === "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return v.map(x => str(x)).filter(Boolean).join("\n").trim();
+  if (typeof v === "object") return Object.values(v).map(x => str(x)).filter(Boolean).join(" ").trim();
   return String(v).trim();
 }
 

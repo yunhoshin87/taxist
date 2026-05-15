@@ -184,6 +184,17 @@ def search_all_laws(query: str) -> list[dict]:
 # 법령 본문 → MD 변환
 # ─────────────────────────────────────────────────────────────
 
+def _s(v) -> str:
+    """API 응답값을 안전하게 문자열로 변환 (리스트·딕셔너리 포함)"""
+    if v is None:
+        return ""
+    if isinstance(v, list):
+        return "\n".join(_s(x) for x in v if x is not None).strip()
+    if isinstance(v, dict):
+        return str(v).strip()
+    return str(v).strip()
+
+
 def law_to_md(data: dict, meta: dict) -> str:
     """법령 API 응답 JSON → Markdown"""
     법령 = data.get("법령", {})
@@ -217,18 +228,17 @@ def law_to_md(data: dict, meta: dict) -> str:
         조문_목록 = [조문_목록]
 
     for 조 in 조문_목록:
-        편장절  = (조.get("편장절구분") or "").strip()
-        편장절명 = (조.get("편장절제목") or "").strip()
-        조번호  = (조.get("조문번호") or "").strip()
-        조제목  = (조.get("조문제목") or "").strip()
-        조내용  = (조.get("조문내용") or "").strip()
+        편장절  = _s(조.get("편장절구분"))
+        편장절명 = _s(조.get("편장절제목"))
+        조번호  = _s(조.get("조문번호"))
+        조제목  = _s(조.get("조문제목"))
+        조내용  = _s(조.get("조문내용"))
 
         if 편장절 in ("편", "장", "절", "관", "목"):
-            num  = 조.get("편장절번호") or ""
+            num = _s(조.get("편장절번호"))
             lines += [f"## {편장절} {num} {편장절명}".strip(), ""]
             continue
 
-        # 조 제목 줄
         heading = f"제{조번호}조"
         if 조제목:
             heading += f" ({조제목})"
@@ -242,8 +252,8 @@ def law_to_md(data: dict, meta: dict) -> str:
         if isinstance(항_목록, dict):
             항_목록 = [항_목록]
         for 항 in 항_목록:
-            항번호 = (항.get("항번호") or "").strip()
-            항내용 = (항.get("항내용") or "").strip()
+            항번호 = _s(항.get("항번호"))
+            항내용 = _s(항.get("항내용"))
             prefix = _circle(항번호)
             if 항내용:
                 lines.append(f"{prefix} {항내용}")
@@ -253,8 +263,8 @@ def law_to_md(data: dict, meta: dict) -> str:
             if isinstance(호_목록, dict):
                 호_목록 = [호_목록]
             for 호 in 호_목록:
-                호번호 = (호.get("호번호") or "").strip()
-                호내용 = (호.get("호내용") or "").strip()
+                호번호 = _s(호.get("호번호"))
+                호내용 = _s(호.get("호내용"))
                 if 호내용:
                     lines.append(f"  {호번호}. {호내용}")
                 # 목
@@ -262,8 +272,8 @@ def law_to_md(data: dict, meta: dict) -> str:
                 if isinstance(목_목록, dict):
                     목_목록 = [목_목록]
                 for 목 in 목_목록:
-                    목번호 = (목.get("목번호") or "").strip()
-                    목내용 = (목.get("목내용") or "").strip()
+                    목번호 = _s(목.get("목번호"))
+                    목내용 = _s(목.get("목내용"))
                     if 목내용:
                         lines.append(f"    {목번호}) {목내용}")
         lines.append("")
@@ -276,8 +286,8 @@ def law_to_md(data: dict, meta: dict) -> str:
     if 부칙_목록:
         lines += ["---", "", "## 부칙", ""]
         for 부 in 부칙_목록:
-            pub = fmt_date(부.get("공포일자", ""))
-            내용 = (부.get("부칙내용") or "").strip()
+            pub  = fmt_date(_s(부.get("공포일자")))
+            내용 = _s(부.get("부칙내용"))
             if pub:
                 lines += [f"### 부칙 ({pub})", ""]
             if 내용:
