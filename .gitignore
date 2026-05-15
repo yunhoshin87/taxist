@@ -1,0 +1,16 @@
+# PDF / 대용량 원본 자료
+*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
+
+# Node (향후 빌드 도구 사용 시)
+node_modules/
+dist/
+.env

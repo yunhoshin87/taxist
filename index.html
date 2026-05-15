@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TAXIST — 세무행정 AI 질의응답 서비스</title>
+  <style>
+    /* ───────────────────────────────────────────
+       Design tokens  (Airbnb-inspired, adapted)
+    ─────────────────────────────────────────── */
+    :root {
+      --coral:      #E05B4B;
+      --coral-dark: #C24636;
+      --coral-light:#FFF0EE;
+      --navy:       #1B2B4B;
+      --navy-mid:   #2E4370;
+      --sky:        #4A90D9;
+      --bg:         #F7F5F2;
+      --bg-card:    #FFFFFF;
+      --text:       #222831;
+      --text-muted: #6B7280;
+      --border:     #E5E7EB;
+      --radius-sm:  8px;
+      --radius-md:  16px;
+      --radius-lg:  24px;
+      --radius-xl:  32px;
+      --shadow-sm:  0 1px 4px rgba(0,0,0,.06);
+      --shadow-md:  0 4px 20px rgba(0,0,0,.10);
+      --shadow-lg:  0 12px 40px rgba(0,0,0,.13);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+           background: var(--bg); color: var(--text); line-height: 1.6; }
+    a { text-decoration: none; color: inherit; }
+    img { display: block; max-width: 100%; }
+    button { cursor: pointer; border: none; outline: none; font-family: inherit; }
+
+    /* ── Typography ── */
+    h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.2; letter-spacing: -.03em; }
+    h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: -.02em; }
+    h3 { font-size: 1.15rem; font-weight: 700; }
+
+    /* ── Layout ── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    section { padding: 80px 0; }
+
+    /* ══════════════════════════════════════════
+       NAV
+    ══════════════════════════════════════════ */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.4rem; font-weight: 800; color: var(--navy);
+      letter-spacing: -.04em;
+    }
+    .logo-dot { color: var(--coral); }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a {
+      font-size: .92rem; font-weight: 500; color: var(--text-muted);
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--navy); }
+    .nav-cta {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .btn { display: inline-flex; align-items: center; justify-content: center;
+           font-size: .9rem; font-weight: 600; border-radius: 100px;
+           padding: 10px 22px; transition: all .2s; }
+    .btn-outline { border: 1.5px solid var(--border); background: transparent; color: var(--navy); }
+    .btn-outline:hover { border-color: var(--navy); background: var(--navy); color: #fff; }
+    .btn-coral { background: var(--coral); color: #fff; box-shadow: 0 2px 10px rgba(224,91,75,.3); }
+    .btn-coral:hover { background: var(--coral-dark); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(224,91,75,.4); }
+
+    /* ══════════════════════════════════════════
+       HERO
+    ══════════════════════════════════════════ */
+    .hero {
+      padding: 100px 0 80px;
+      background: linear-gradient(135deg, #1B2B4B 0%, #2E4370 60%, #1B2B4B 100%);
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 80% 50%, rgba(224,91,75,.18) 0%, transparent 60%);
+    }
+    .hero-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 60px; align-items: center;
+      position: relative; z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+      border-radius: 100px; padding: 6px 16px; font-size: .8rem; font-weight: 600;
+      color: rgba(255,255,255,.85); margin-bottom: 20px;
+    }
+    .hero-badge span { width: 6px; height: 6px; border-radius: 50%; background: #6EE7B7; display: inline-block; }
+    .hero h1 { color: #fff; margin-bottom: 20px; }
+    .hero h1 em { color: var(--coral); font-style: normal; }
+    .hero-desc { color: rgba(255,255,255,.72); font-size: 1.05rem; line-height: 1.75; margin-bottom: 36px; }
+    .hero-actions { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .btn-hero { padding: 14px 30px; font-size: 1rem; border-radius: 14px; }
+    .btn-hero-ghost {
+      background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.25);
+      color: #fff; border-radius: 14px; padding: 14px 28px; font-size: 1rem; font-weight: 600;
+      transition: all .2s;
+    }
+    .btn-hero-ghost:hover { background: rgba(255,255,255,.2); }
+    .hero-note { margin-top: 20px; font-size: .82rem; color: rgba(255,255,255,.45); }
+
+    /* hero card */
+    .hero-visual {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .hcard {
+      background: rgba(255,255,255,.1); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,.15); border-radius: var(--radius-md);
+      padding: 20px 24px; color: #fff;
+    }
+    .hcard-label { font-size: .75rem; font-weight: 600; color: rgba(255,255,255,.5);
+                   text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .hcard-q { font-size: .9rem; line-height: 1.6; color: rgba(255,255,255,.9); }
+    .hcard-answer {
+      background: rgba(255,255,255,.05);
+      border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 10px;
+      font-size: .82rem; color: rgba(255,255,255,.65); line-height: 1.7;
+    }
+    .hcard-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+    .tag {
+      font-size: .72rem; font-weight: 600; padding: 3px 10px;
+      border-radius: 100px; background: rgba(224,91,75,.25); color: #FFA99D;
+    }
+    .tag.blue { background: rgba(74,144,217,.25); color: #90C4F7; }
+    .tag.green { background: rgba(110,231,183,.2); color: #6EE7B7; }
+    .typing-cursor { animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ══════════════════════════════════════════
+       STATS
+    ══════════════════════════════════════════ */
+    .stats {
+      background: var(--navy);
+      padding: 40px 0;
+    }
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 1px; background: rgba(255,255,255,.08);
+      border-radius: var(--radius-md); overflow: hidden;
+    }
+    .stat-item {
+      background: var(--navy); padding: 28px 24px; text-align: center;
+    }
+    .stat-num { font-size: 2rem; font-weight: 800; color: #fff; letter-spacing: -.03em; }
+    .stat-num span { color: var(--coral); }
+    .stat-label { font-size: .82rem; color: rgba(255,255,255,.5); margin-top: 4px; }
+
+    /* ══════════════════════════════════════════
+       FEATURES
+    ══════════════════════════════════════════ */
+    .section-label {
+      display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--coral); margin-bottom: 14px;
+    }
+    .section-title { margin-bottom: 14px; }
+    .section-desc { color: var(--text-muted); font-size: 1rem; max-width: 560px; line-height: 1.75; }
+    .section-head { margin-bottom: 56px; }
+
+    .features-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feat-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 32px 28px;
+      transition: all .25s;
+    }
+    .feat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+    .feat-icon {
+      width: 52px; height: 52px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 20px;
+      background: var(--coral-light);
+    }
+    .feat-icon.blue { background: #EEF4FF; }
+    .feat-icon.green { background: #EDFDF8; }
+    .feat-icon.purple { background: #F5F0FF; }
+    .feat-icon.yellow { background: #FFFBEB; }
+    .feat-icon.teal { background: #ECFEFF; }
+    .feat-card h3 { margin-bottom: 10px; }
+    .feat-card p { font-size: .88rem; color: var(--text-muted); line-height: 1.7; }
+
+    /* ══════════════════════════════════════════
+       HOW IT WORKS
+    ══════════════════════════════════════════ */
+    .how { background: var(--navy); }
+    .how .section-label { color: #6EE7B7; }
+    .how .section-title { color: #fff; }
+    .how .section-desc { color: rgba(255,255,255,.6); }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+    .steps::before {
+      content: '';
+      position: absolute; top: 36px; left: calc(12.5% + 24px); right: calc(12.5% + 24px);
+      height: 2px; background: rgba(255,255,255,.1);
+      background: linear-gradient(90deg, var(--coral) 0%, rgba(255,255,255,.15) 100%);
+    }
+    .step { text-align: center; padding: 0 16px; position: relative; }
+    .step-num {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; font-weight: 800; margin: 0 auto 20px;
+      background: var(--navy-mid); border: 2px solid rgba(255,255,255,.12);
+      color: #fff; position: relative; z-index: 1;
+    }
+    .step:first-child .step-num { background: var(--coral); border-color: var(--coral); }
+    .step h3 { color: #fff; margin-bottom: 10px; font-size: 1rem; }
+    .step p { font-size: .83rem; color: rgba(255,255,255,.5); line-height: 1.7; }
+
+    /* ══════════════════════════════════════════
+       TAX CATEGORIES
+    ══════════════════════════════════════════ */
+    .cats-grid {
+      display: grid; grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+    }
+    .cat-card {
+      background: var(--bg-card); border: 1.5px solid var(--border);
+      border-radius: var(--radius-md); padding: 24px 16px; text-align: center;
+      transition: all .2s; cursor: pointer;
+    }
+    .cat-card:hover {
+      border-color: var(--coral); background: var(--coral-light);
+      transform: translateY(-3px); box-shadow: var(--shadow-sm);
+    }
+    .cat-emoji { font-size: 2rem; margin-bottom: 12px; }
+    .cat-name { font-size: .88rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .cat-desc { font-size: .75rem; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════════
+       ANSWER PREVIEW
+    ══════════════════════════════════════════ */
+    .preview { background: linear-gradient(180deg, #F7F5F2 0%, #FFFFFF 100%); }
+    .preview-wrap {
+      display: grid; grid-template-columns: 1fr 1.4fr; gap: 48px; align-items: start;
+    }
+    .preview-left .section-head { margin-bottom: 32px; }
+    .answer-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+    .answer-header {
+      background: var(--navy); padding: 16px 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .answer-header-dots { display: flex; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.red   { background: #FF5F56; }
+    .dot.yellow{ background: #FFBD2E; }
+    .dot.green { background: #27C93F; }
+    .answer-title { color: rgba(255,255,255,.7); font-size: .82rem; flex: 1; text-align: center; }
+    .answer-body { padding: 28px 24px; }
+    .ans-section { margin-bottom: 20px; }
+    .ans-section:last-child { margin-bottom: 0; }
+    .ans-section-title {
+      font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--coral); margin-bottom: 8px;
+    }
+    .ans-section-content {
+      font-size: .85rem; color: var(--text); line-height: 1.75;
+      background: #F9FAFB; border-radius: var(--radius-sm);
+      padding: 12px 14px; border-left: 3px solid var(--coral);
+    }
+    .ans-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .ans-table th { background: var(--navy); color: #fff; padding: 8px 12px; text-align: left; font-size: .75rem; }
+    .ans-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+    .ans-table tr:hover td { background: #F9FAFB; }
+    .ans-sources {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+    }
+    .source-chip {
+      font-size: .72rem; padding: 4px 10px; border-radius: 100px;
+      background: #EEF4FF; color: var(--sky); font-weight: 600;
+    }
+    .ans-warning {
+      background: #FFFBEB; border: 1px solid #FDE68A;
+      border-radius: var(--radius-sm); padding: 10px 14px; font-size: .78rem;
+      color: #92400E; margin-top: 16px;
+    }
+
+    /* ══════════════════════════════════════════
+       PRICING / FREE TRIAL
+    ══════════════════════════════════════════ */
+    .pricing { background: var(--bg); }
+    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 780px; margin: 0 auto; }
+    .price-card {
+      background: var(--bg-card); border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg); padding: 36px 32px;
+    }
+    .price-card.featured {
+      background: var(--navy); border-color: var(--navy);
+      position: relative; overflow: hidden;
+    }
+    .price-card.featured::before {
+      content: ''; position: absolute; top: -40px; right: -40px;
+      width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(224,91,75,.3);
+    }
+    .price-badge {
+      display: inline-block; font-size: .72rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 100px;
+      background: var(--coral); color: #fff; margin-bottom: 16px;
+    }
+    .price-name { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text-muted); }
+    .price-card.featured .price-name { color: rgba(255,255,255,.6); }
+    .price-amount { font-size: 2.4rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: 4px; }
+    .price-card.featured .price-amount { color: #fff; }
+    .price-period { font-size: .82rem; color: var(--text-muted); margin-bottom: 24px; }
+    .price-card.featured .price-period { color: rgba(255,255,255,.5); }
+    .price-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .price-features li { display: flex; align-items: center; gap: 10px; font-size: .88rem; }
+    .price-card.featured .price-features li { color: rgba(255,255,255,.85); }
+    .check { color: var(--coral); font-weight: 700; }
+    .price-card.featured .check { color: #6EE7B7; }
+    .btn-full { width: 100%; padding: 14px; border-radius: var(--radius-sm); }
+
+    /* ══════════════════════════════════════════
+       TESTIMONIALS
+    ══════════════════════════════════════════ */
+    .testimonials { background: #fff; }
+    .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .test-card {
+      background: var(--bg); border-radius: var(--radius-md); padding: 28px 24px;
+      border: 1px solid var(--border);
+    }
+    .test-stars { color: var(--coral); font-size: 1rem; margin-bottom: 14px; }
+    .test-text { font-size: .88rem; color: var(--text); line-height: 1.75; margin-bottom: 18px; }
+    .test-author { display: flex; align-items: center; gap: 12px; }
+    .test-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--navy); display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: .8rem; font-weight: 700; flex-shrink: 0;
+    }
+    .test-name { font-size: .88rem; font-weight: 700; }
+    .test-role { font-size: .76rem; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════════
+       CTA BANNER
+    ══════════════════════════════════════════ */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--coral) 0%, #C24636 100%);
+      padding: 80px 0; text-align: center;
+    }
+    .cta-banner h2 { color: #fff; margin-bottom: 14px; }
+    .cta-banner p { color: rgba(255,255,255,.8); font-size: 1rem; margin-bottom: 36px; }
+    .btn-white { background: #fff; color: var(--coral); border-radius: 100px; padding: 14px 36px;
+                 font-size: 1rem; font-weight: 700; transition: all .2s; }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+
+    /* ══════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════ */
+    footer {
+      background: var(--navy); padding: 60px 0 32px;
+      color: rgba(255,255,255,.5);
+    }
+    .footer-grid {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 48px; margin-bottom: 48px;
+    }
+    .footer-brand .logo { color: #fff; margin-bottom: 14px; }
+    .footer-brand p { font-size: .84rem; line-height: 1.7; max-width: 280px; }
+    .footer-col h4 { color: rgba(255,255,255,.9); font-size: .88rem; font-weight: 700;
+                     margin-bottom: 16px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul li a { font-size: .82rem; transition: color .2s; }
+    .footer-col ul li a:hover { color: var(--coral); }
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,.08); padding-top: 28px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: .78rem;
+    }
+    .footer-bottom a { color: rgba(255,255,255,.4); margin-left: 16px; transition: color .2s; }
+    .footer-bottom a:hover { color: var(--coral); }
+
+    /* ══════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════ */
+    @media (max-width: 1024px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .cats-grid { grid-template-columns: repeat(3, 1fr); }
+      .steps { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+      .steps::before { display: none; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .features-grid { grid-template-columns: 1fr; }
+      .preview-wrap { grid-template-columns: 1fr; }
+      .test-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <a href="#" class="logo">
+        TAXI<span class="logo-dot">ST</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">주요 기능</a>
+        <a href="#how">이용 방법</a>
+        <a href="#categories">세목별 서비스</a>
+        <a href="#pricing">요금제</a>
+      </div>
+      <div class="nav-cta">
+        <a href="login.html" class="btn btn-outline">로그인</a>
+        <a href="signup.html" class="btn btn-coral">무료 시작하기</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-left">
+        <div class="hero-badge">
+          <span></span> 세무공무원 전용 AI 서비스
+        </div>
+        <h1>세무행정 질의에<br><em>AI 답변</em>을<br>즉시 받으세요</h1>
+        <p class="hero-desc">
+          법령·판례·조례·내부 지침을 기반으로 실무에 바로 활용할 수 있는<br>
+          근거 중심 답변을 생성합니다. 보고서 출력까지 한 번에.
+        </p>
+        <div class="hero-actions">
+          <a href="signup.html" class="btn btn-coral btn-hero">1개월 무료로 시작하기</a>
+          <button class="btn-hero-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
+            서비스 소개 보기 →
+          </button>
+        </div>
+        <p class="hero-note">* 신용카드 없이 가입 · 1개월 무료 · 언제든 해지 가능</p>
+      </div>
+      <div class="hero-visual">
+        <div class="hcard">
+          <div class="hcard-label">질문 입력 예시</div>
+          <div class="hcard-q">
+            법인이 자회사 주식을 시가보다 낮게 양도한 경우<br>
+            부당행위계산 부인 규정의 적용 가능성과 관련 판례를 검토해 주세요.
+          </div>
+          <div class="hcard-tags">
+            <span class="tag">법인세</span>
+            <span class="tag blue">부당행위계산</span>
+            <span class="tag green">판례 조회 중</span>
+          </div>
+        </div>
+        <div class="hcard">
+          <div class="hcard-label">AI 답변 생성 중<span class="typing-cursor">|</span></div>
+          <div class="hcard-answer">
+            <strong style="color:#fff;">1. 질의 요지</strong><br>
+            법인이 특수관계인인 자회사에 시가 미달 가액으로 주식 양도 시<br>
+            법인세법 §52 부당행위계산 부인 규정 적용 여부…
+          </div>
+          <div class="hcard-tags">
+            <span class="tag blue">법인세법 §52</span>
+            <span class="tag">대법원 2023두12345</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ STATS ═══════════════ -->
+<div class="stats">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-num">6<span>개</span></div>
+        <div class="stat-label">세목 전문 답변</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">5<span>단계</span></div>
+        <div class="stat-label">체계적 검토 프로세스</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">1<span>개월</span></div>
+        <div class="stat-label">무료 체험 기간</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">PDF<span>/DOCX</span></div>
+        <div class="stat-label">보고서 즉시 출력</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ FEATURES ═══════════════ -->
+<section id="features">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-label">FEATURES</div>
+      <h2 class="section-title">실무에 필요한 모든 기능</h2>
+      <p class="section-desc">세무행정 현장의 질의 처리 흐름을 그대로 디지털화했습니다.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon">⚖️</div>
+        <h3>법령·판례 자동 조회</h3>
+        <p>질문에서 핵심 쟁점을 추출하고 관련 법령 API와 판례 DB를 실시간으로 조회하여 최신 해석례를 제공합니다.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon blue">📁</div>
+        <h3>내부 자료 기반 답변</h3>
+        <p>관리자가 업로드한 업무 지침, 사례집, 조례 등 폴더트리 내 자료를 근거로 사용하여 기관별 맞춤 답변을 생성합니다.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon green">📝</div>
+        <h3>표·텍스트 리치 에디터</h3>
+        <p>한글·엑셀 표를 그대로 붙여넣어 서식을 유지한 채 질문을 입력할 수 있습니다. 긴 텍스트와 임시저장도 지원합니다.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon purple">📊</div>
+        <h3>보고서 즉시 출력</h3>
+        <p>질의 요지부터 결론까지 10개 항목으로 구성된 공식 보고서를 PDF·DOCX·HTML 형식으로 즉시 내려받을 수 있습니다.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon yellow">🔍</div>
+        <h3>근거 출처 완전 투명화</h3>
+        <p>모든 답변에 사용된 법령, 판례, 내부 자료의 출처를 명시합니다. 근거 없는 단정과 허용 폴더 외 자료 참조를 차단합니다.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon teal">🏛️</div>
+        <h3>세목별 맞춤 관리</h3>
+        <p>법인세·부가세·조사·징세·재산세·개인세 6개 세목을 기준으로 회원 권한과 자료 접근 범위를 세분화합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+<section id="how" class="how">
+  <div class="container">
+    <div class="section-head" style="text-align:center;">
+      <div class="section-label">HOW IT WORKS</div>
+      <h2 class="section-title">5단계 검토 프로세스</h2>
+      <p class="section-desc" style="margin:0 auto;">단순 키워드 검색이 아닙니다. 실무 전문가의 검토 순서를 그대로 따릅니다.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>질문 내용 분석</h3>
+        <p>질의 요지·사실관계·세목·판단 필요사항을 자동 추출합니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>법령·판례 API 조회</h3>
+        <p>핵심 키워드로 유사 판례·결정례·해석례를 실시간 조회합니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>조례·지침 검토</h3>
+        <p>판례 기반 쟁점에 맞는 조례·시행규칙·고시·내부 지침을 확인합니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>업로드 자료 조회</h3>
+        <p>허용 폴더트리 내 MD 파일·책 자료만 근거로 활용하여 출처를 명기합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CATEGORIES ═══════════════ -->
+<section id="categories">
+  <div class="container">
+    <div class="section-head" style="text-align:center;">
+      <div class="section-label">CATEGORIES</div>
+      <h2 class="section-title">6개 세목 전문 서비스</h2>
+      <p class="section-desc" style="margin:0 auto;">회원가입 시 담당 세목을 선택하면 그에 맞는 자료와 답변 범위가 자동으로 설정됩니다.</p>
+    </div>
+    <div class="cats-grid">
+      <div class="cat-card">
+        <div class="cat-emoji">🏢</div>
+        <div class="cat-name">법인세</div>
+        <div class="cat-desc">법인 소득·조정·소득처분</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-emoji">🧾</div>
+        <div class="cat-name">부가세</div>
+        <div class="cat-desc">신고·환급·세금계산서</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-emoji">🔎</div>
+        <div class="cat-name">조사</div>
+        <div class="cat-desc">세무조사 절차·사례</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-emoji">📬</div>
+        <div class="cat-name">징세</div>
+        <div class="cat-desc">체납처분·압류·공매</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-emoji">🏠</div>
+        <div class="cat-name">재산세</div>
+        <div class="cat-desc">과세대상·감면·이의신청</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-emoji">👤</div>
+        <div class="cat-name">개인세</div>
+        <div class="cat-desc">종합소득·양도·상속</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ ANSWER PREVIEW ═══════════════ -->
+<section class="preview">
+  <div class="container">
+    <div class="preview-wrap">
+      <div class="preview-left">
+        <div class="section-head">
+          <div class="section-label">ANSWER PREVIEW</div>
+          <h2 class="section-title">실무 보고서<br>그대로 복사·활용</h2>
+          <p class="section-desc">
+            답변은 단순 텍스트가 아닙니다.<br>
+            법령·판례·내부 자료를 출처별로 구분하여<br>
+            보고서에 바로 붙여 쓸 수 있는 형식으로 제공합니다.
+          </p>
+        </div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:12px;">
+          <li style="display:flex;align-items:center;gap:10px;font-size:.88rem;">
+            <span style="color:var(--coral);font-size:1.1rem;">✓</span> 질의 요지·사실관계 자동 정리
+          </li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:.88rem;">
+            <span style="color:var(--coral);font-size:1.1rem;">✓</span> 법령·판례 표 형태 제공
+          </li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:.88rem;">
+            <span style="color:var(--coral);font-size:1.1rem;">✓</span> 내부 자료 경로 출처 명기
+          </li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:.88rem;">
+            <span style="color:var(--coral);font-size:1.1rem;">✓</span> 최종 검토 의견 + 결론
+          </li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:.88rem;">
+            <span style="color:var(--coral);font-size:1.1rem;">✓</span> PDF·DOCX 즉시 내보내기
+          </li>
+        </ul>
+      </div>
+      <div class="preview-right">
+        <div class="answer-box">
+          <div class="answer-header">
+            <div class="answer-header-dots">
+              <div class="dot red"></div>
+              <div class="dot yellow"></div>
+              <div class="dot green"></div>
+            </div>
+            <div class="answer-title">AI 답변 — 법인세 · 부당행위계산 부인</div>
+          </div>
+          <div class="answer-body">
+            <div class="ans-section">
+              <div class="ans-section-title">1. 질의 요지</div>
+              <div class="ans-section-content">
+                법인이 특수관계인인 자회사에 시가보다 낮은 가액으로 주식을 양도한 경우 법인세법 제52조 부당행위계산 부인 규정의 적용 가능성 및 적정 시가 산정 방법에 관한 검토
+              </div>
+            </div>
+            <div class="ans-section">
+              <div class="ans-section-title">3. 관련 법령 및 판례</div>
+              <table class="ans-table">
+                <thead><tr><th>구분</th><th>명칭</th><th>관련성</th></tr></thead>
+                <tbody>
+                  <tr><td>법령</td><td>법인세법 §52, 시행령 §88</td><td>부당행위계산 요건</td></tr>
+                  <tr><td>판례</td><td>대법원 2021두52631</td><td>시가 산정 기준</td></tr>
+                  <tr><td>예규</td><td>법인세과-1234, 2022</td><td>특수관계인 범위</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="ans-section">
+              <div class="ans-section-title">근거 자료</div>
+              <div class="ans-sources">
+                <span class="source-chip">📄 2024 포인트 법인조정 실무 p.342</span>
+                <span class="source-chip">📄 법인세 상담사례집 §5-3</span>
+              </div>
+            </div>
+            <div class="ans-warning">
+              ⚠️ 본 답변은 참고용 검토 의견이며, 최종 판단은 담당자의 추가 검토가 필요합니다.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TESTIMONIALS ═══════════════ -->
+<section class="testimonials">
+  <div class="container">
+    <div class="section-head" style="text-align:center;">
+      <div class="section-label">TESTIMONIALS</div>
+      <h2 class="section-title">현장 세무공무원의 이야기</h2>
+    </div>
+    <div class="test-grid">
+      <div class="test-card">
+        <div class="test-stars">★★★★★</div>
+        <p class="test-text">"부당행위계산 관련 질의를 처리할 때 판례 리서치에만 반나절이 걸렸는데, TAXIST로 핵심 판례와 근거를 5분 안에 정리할 수 있었습니다."</p>
+        <div class="test-author">
+          <div class="test-avatar">김</div>
+          <div>
+            <div class="test-name">김○○ 주무관</div>
+            <div class="test-role">○○세무서 법인세과</div>
+          </div>
+        </div>
+      </div>
+      <div class="test-card">
+        <div class="test-stars">★★★★★</div>
+        <p class="test-text">"표를 엑셀에서 그대로 붙여넣기해서 질문할 수 있는 게 정말 편합니다. 답변도 보고서 형식으로 나와서 거의 수정 없이 사용할 수 있어요."</p>
+        <div class="test-author">
+          <div class="test-avatar">이</div>
+          <div>
+            <div class="test-name">이○○ 주사</div>
+            <div class="test-role">○○시청 재산세과</div>
+          </div>
+        </div>
+      </div>
+      <div class="test-card">
+        <div class="test-stars">★★★★☆</div>
+        <p class="test-text">"내부 지침이 업데이트될 때마다 MD 파일로 업로드하면 바로 반영되어서, 항상 최신 기준으로 답변이 나옵니다. 팀 전체에 공유해서 쓰고 있습니다."</p>
+        <div class="test-author">
+          <div class="test-avatar">박</div>
+          <div>
+            <div class="test-name">박○○ 팀장</div>
+            <div class="test-role">○○지방국세청 조사과</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PRICING ═══════════════ -->
+<section id="pricing" class="pricing">
+  <div class="container">
+    <div class="section-head" style="text-align:center;">
+      <div class="section-label">PRICING</div>
+      <h2 class="section-title">합리적인 요금제</h2>
+      <p class="section-desc" style="margin:0 auto;">지금은 1개월 무료로 모든 기능을 체험하세요.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="price-name">무료 체험</div>
+        <div class="price-amount">₩0</div>
+        <div class="price-period">가입 후 1개월간</div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> 무제한 질문 등록</li>
+          <li><span class="check">✓</span> AI 답변 생성</li>
+          <li><span class="check">✓</span> 법령·판례 조회</li>
+          <li><span class="check">✓</span> 기본 보고서 출력</li>
+          <li><span class="check">✓</span> 6개 세목 전체 접근</li>
+        </ul>
+        <a href="signup.html" class="btn btn-outline btn-full">무료로 시작하기</a>
+      </div>
+      <div class="price-card featured">
+        <div class="price-badge">오픈 예정</div>
+        <div class="price-name">정식 구독</div>
+        <div class="price-amount" style="color:#fff;">준비 중</div>
+        <div class="price-period">무료 체험 이후 결제 전환</div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> 무료 체험 모든 기능 포함</li>
+          <li><span class="check">✓</span> PDF·DOCX 보고서 출력</li>
+          <li><span class="check">✓</span> 질문 이력 무제한 보관</li>
+          <li><span class="check">✓</span> 관리자 업로드 자료 우선 반영</li>
+          <li><span class="check">✓</span> 기관 단위 계정 관리</li>
+        </ul>
+        <button class="btn btn-coral btn-full" style="border-radius:8px;" onclick="alert('서비스 오픈 시 안내드리겠습니다.')">
+          오픈 알림 신청
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CTA ═══════════════ -->
+<div class="cta-banner">
+  <div class="container">
+    <h2>지금 바로 무료로 시작하세요</h2>
+    <p>신용카드 없이 1분 가입 · 1개월 무료 · 언제든 해지 가능</p>
+    <a href="signup.html" class="btn-white">무료 회원가입 →</a>
+  </div>
+</div>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">TAXI<span class="logo-dot">ST</span></div>
+        <p>세무행정 질의응답 AI 서비스.<br>법령·판례·조례·내부 자료를 기반으로 한<br>근거 중심 답변을 세무공무원에게 제공합니다.</p>
+      </div>
+      <div class="footer-col">
+        <h4>서비스</h4>
+        <ul>
+          <li><a href="#features">주요 기능</a></li>
+          <li><a href="#how">이용 방법</a></li>
+          <li><a href="#categories">세목별 서비스</a></li>
+          <li><a href="#pricing">요금제</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>계정</h4>
+        <ul>
+          <li><a href="signup.html">회원가입</a></li>
+          <li><a href="login.html">로그인</a></li>
+          <li><a href="mypage.html">내 질문 목록</a></li>
+          <li><a href="admin/">관리자</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>안내</h4>
+        <ul>
+          <li><a href="#">이용약관</a></li>
+          <li><a href="#">개인정보처리방침</a></li>
+          <li><a href="#">고객지원</a></li>
+          <li><a href="#">공지사항</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 TAXIST. All rights reserved. 본 서비스는 참고용 검토 의견을 제공하며, 최종 법적 판단의 책임은 담당자에게 있습니다.</span>
+      <div>
+        <a href="#">이용약관</a>
+        <a href="#">개인정보처리방침</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  /* 스크롤 진입 시 카드 페이드인 */
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.feat-card, .cat-card, .test-card, .step').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity .5s ease, transform .5s ease';
+    observer.observe(el);
+  });
+
+  /* 네비게이션 active */
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.style.color = a.getAttribute('href') === '#' + current ? 'var(--coral)' : '';
+    });
+  });
+</script>
+</body>
+</html>
