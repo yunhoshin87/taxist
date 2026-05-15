@@ -399,19 +399,46 @@ function checkSubmit() {
   document.getElementById('step3Submit').disabled = !ok;
 }
 
-function handleSignup() {
+async function handleSignup() {
   const btn = document.getElementById('step3Submit');
+  const pw = document.getElementById('pw').value;
+  const pw2 = document.getElementById('pw2').value;
+  if (pw !== pw2) { alert('비밀번호가 일치하지 않습니다.'); return; }
+
   btn.textContent = '처리 중...';
   btn.disabled = true;
-  // TODO: 실제 API 연동
-  setTimeout(() => {
-    const end = new Date();
-    end.setMonth(end.getMonth() + 1);
+
+  const tax_categories = [...document.querySelectorAll('.tax-item input:checked')].map(c => c.value);
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        password: pw,
+        org: document.getElementById('org').value,
+        phone: document.getElementById('phone').value,
+        tax_categories,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || '가입에 실패했습니다.');
+      btn.textContent = '가입 완료'; btn.disabled = false;
+      return;
+    }
+    localStorage.setItem('taxist_token', data.token);
+    localStorage.setItem('taxist_user', JSON.stringify(data.user));
+    const end = new Date(data.user.trial_ends_at);
     document.getElementById('trialEnd').textContent =
-      end.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
+      end.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
     goStep(4);
     document.querySelector('.steps-nav').style.display = 'none';
-  }, 1200);
+  } catch {
+    alert('서버 연결에 실패했습니다.');
+    btn.textContent = '가입 완료'; btn.disabled = false;
+  }
 }
 </script>
 </body>

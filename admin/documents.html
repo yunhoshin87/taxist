@@ -191,141 +191,107 @@
 <script src="_common.js"></script>
 <script>
 requireAdmin();
-
+let allFolders = [];
 let selectedFolderId = null;
-let selectedSubFolderId = null;
 
-// 폴더 트리 렌더링
+async function loadFolders() {
+  try {
+    const { folders } = await api('/api/admin/folders');
+    allFolders = folders;
+  } catch (e) {
+    allFolders = [];
+    console.error('폴더 로드 실패:', e);
+  }
+  renderTree();
+  if (selectedFolderId) renderFileList(selectedFolderId);
+}
+
 function renderTree() {
-  document.getElementById('folderTree').innerHTML = FOLDERS.map(f=>`
+  document.getElementById('folderTree').innerHTML = allFolders.map(f => `
     <div class="folder-item">
-      <div class="folder-header ${selectedFolderId===f.id&&!selectedSubFolderId?'active':''}"
-           id="fh${f.id}" onclick="toggleFolder(${f.id})">
-        <div class="folder-dot" style="background:${f.color}"></div>
+      <div class="folder-header ${selectedFolderId === f.id ? 'active' : ''}"
+           onclick="selectFolder(${f.id})">
+        <div class="folder-dot" style="background:${f.is_active ? '#10B981' : '#9CA3AF'}"></div>
         <span class="folder-name">${f.name}</span>
-        <span class="folder-count">${f.children.reduce((a,c)=>a+c.files.length,0)}개</span>
-        <span class="folder-arrow ${selectedFolderId===f.id?'open':''}" id="fa${f.id}">▶</span>
-      </div>
-      <div class="subfolder-list ${selectedFolderId===f.id?'open':''}" id="sf${f.id}">
-        ${f.children.map(sub=>`
-          <div class="subfolder-item ${selectedSubFolderId===sub.id?'active':''}"
-               onclick="selectSubfolder(${f.id},${sub.id})">
-            📂 ${sub.name} <span style="margin-left:auto;font-size:.72rem;color:var(--text-muted)">${sub.files.length}</span>
-          </div>`).join('')}
+        <span class="folder-count">${f.documents.length}개</span>
+        <label class="toggle-switch" title="폴더 활성화" onclick="event.stopPropagation()" style="margin-left:auto">
+          <input type="checkbox" ${f.is_active ? 'checked' : ''} onchange="toggleFolder(${f.id},this.checked)" />
+          <span class="slider"></span>
+        </label>
       </div>
     </div>`).join('');
 }
 
-function toggleFolder(fid) {
-  if(selectedFolderId===fid && !selectedSubFolderId) {
-    selectedFolderId = null;
-  } else {
-    selectedFolderId = fid;
-    selectedSubFolderId = null;
-    renderFileList(fid, null);
-  }
-  renderTree();
-}
-
-function selectSubfolder(fid, sfid) {
+function selectFolder(fid) {
   selectedFolderId = fid;
-  selectedSubFolderId = sfid;
   renderTree();
-  renderFileList(fid, sfid);
+  renderFileList(fid);
 }
 
-function renderFileList(fid, sfid) {
-  const folder = FOLDERS.find(f=>f.id===fid);
-  if(!folder) return;
-
-  let files = [];
-  let subtitle = folder.name;
-  if(sfid) {
-    const sub = folder.children.find(c=>c.id===sfid);
-    files = sub ? sub.files : [];
-    subtitle = `${folder.name} / ${sub?.name || ''}`;
-  } else {
-    folder.children.forEach(c=>files.push(...c.files.map(f=>({...f, subName:c.name}))));
-  }
-
-  document.getElementById('panelTitle').textContent = subtitle;
-  document.getElementById('breadcrumb').innerHTML = sfid
-    ? `<span>자료</span> / <strong>${folder.name}</strong> / <strong>${folder.children.find(c=>c.id===sfid)?.name}</strong>`
-    : `<span>자료</span> / <strong>${folder.name}</strong>`;
+function renderFileList(fid) {
+  const folder = allFolders.find(f => f.id === fid);
+  if (!folder) return;
+  document.getElementById('panelTitle').textContent = folder.name;
+  document.getElementById('breadcrumb').innerHTML = `<span>자료</span> / <strong>${folder.name}</strong>`;
   document.getElementById('uploadGuide').style.display = 'none';
 
-  document.getElementById('fileList').innerHTML = files.length
-    ? files.map(f=>`
+  document.getElementById('fileList').innerHTML = folder.documents.length
+    ? folder.documents.map(doc => `
       <div class="file-row">
         <div class="file-icon">📄</div>
         <div style="flex:1">
-          <div class="file-name">${f.name}</div>
-          <div class="file-meta">${f.size} · 수정일 ${f.updatedAt}${f.subName?` · 📂 ${f.subName}`:''}</div>
+          <div class="file-name">${doc.name}</div>
+          <div class="file-meta">수정일 ${doc.updated_at ? doc.updated_at.split('T')[0] : '-'}</div>
           <div class="file-badges">
-            ${f.indexed?'<span class="fbadge fbadge-green">색인완료</span>':'<span class="fbadge fbadge-orange">색인대기</span>'}
-            ${f.active?'<span class="fbadge fbadge-green">답변사용중</span>':'<span class="fbadge fbadge-gray">비활성</span>'}
+            ${doc.is_active ? '<span class="fbadge fbadge-green">답변사용중</span>' : '<span class="fbadge fbadge-gray">비활성</span>'}
           </div>
         </div>
         <div class="file-actions">
           <label class="toggle-switch" title="답변에 사용 여부">
-            <input type="checkbox" ${f.active?'checked':''} onchange="toggleFile(${f.id},this.checked)" />
+            <input type="checkbox" ${doc.is_active ? 'checked' : ''} onchange="toggleDoc(${doc.id},this.checked)" />
             <span class="slider"></span>
           </label>
-          <button class="fbtn fbtn-blue" onclick="alert('색인 재생성 요청이 등록되었습니다.')">색인 갱신</button>
-          <button class="fbtn fbtn-red" onclick="deleteFile(${f.id})">삭제</button>
         </div>
       </div>`).join('')
-    : '<div class="empty-state">📂 이 폴더에 파일이 없습니다.<br>MD 파일을 업로드하세요.</div>';
+    : '<div class="empty-state">📂 이 폴더에 파일이 없습니다.</div>';
 }
 
-function toggleFile(fileId, active) {
-  FOLDERS.forEach(f=>f.children.forEach(c=>c.files.forEach(file=>{
-    if(file.id===fileId) file.active = active;
-  })));
-  renderFileList(selectedFolderId, selectedSubFolderId);
+async function toggleFolder(fid, is_active) {
+  try {
+    await api('/api/admin/folders', { method: 'PUT', body: JSON.stringify({ id: fid, is_active }) });
+    await loadFolders();
+  } catch (e) { alert('변경 실패: ' + e.message); }
 }
 
-function deleteFile(fileId) {
-  if(!confirm('이 파일을 삭제하시겠습니까? 복구할 수 없습니다.')) return;
-  FOLDERS.forEach(f=>f.children.forEach(c=>{
-    c.files = c.files.filter(file=>file.id!==fileId);
-  }));
-  renderFileList(selectedFolderId, selectedSubFolderId);
-  renderTree();
+async function toggleDoc(doc_id, is_active) {
+  try {
+    await api('/api/admin/folders', { method: 'POST', body: JSON.stringify({ doc_id, is_active }) });
+    const folder = allFolders.find(f => f.id === selectedFolderId);
+    if (folder) {
+      const doc = folder.documents.find(d => d.id === doc_id);
+      if (doc) doc.is_active = is_active ? 1 : 0;
+    }
+  } catch (e) {
+    alert('변경 실패: ' + e.message);
+    await loadFolders();
+  }
 }
 
 function handleUpload(e) {
   const file = e.target.files[0];
-  if(!file) return;
-  if(!file.name.endsWith('.md')) { alert('.md 파일만 업로드 가능합니다.'); return; }
-  if(!selectedFolderId) { alert('먼저 폴더를 선택해주세요.'); return; }
-  const folder = FOLDERS.find(f=>f.id===selectedFolderId);
-  const target = selectedSubFolderId
-    ? folder.children.find(c=>c.id===selectedSubFolderId)
-    : folder.children[0];
-  if(!target) { alert('서브폴더를 선택해주세요.'); return; }
-  const newFile = {
-    id: Date.now(), name: file.name,
-    size: (file.size/1024).toFixed(0)+'KB',
-    indexed: false, active: true,
-    updatedAt: new Date().toISOString().split('T')[0],
-  };
-  target.files.push(newFile);
-  alert(`"${file.name}" 업로드 완료! 색인 생성 중...`);
-  setTimeout(()=>{ newFile.indexed=true; renderFileList(selectedFolderId, selectedSubFolderId); }, 1500);
-  renderFileList(selectedFolderId, selectedSubFolderId);
-  renderTree();
-  e.target.value='';
+  if (!file) return;
+  if (!file.name.endsWith('.md')) { alert('.md 파일만 업로드 가능합니다.'); return; }
+  if (!selectedFolderId) { alert('먼저 폴더를 선택해주세요.'); return; }
+  alert(`"${file.name}" 업로드 기능은 준비 중입니다.`);
+  e.target.value = '';
 }
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('uploadZone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if(file) { document.getElementById('fileInput').files = e.dataTransfer.files; handleUpload({target:{files:e.dataTransfer.files}}); }
 }
 
-renderTree();
+loadFolders();
 </script>
 </body>
 </html>

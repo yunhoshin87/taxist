@@ -134,9 +134,9 @@
     <div class="card">
       <div class="tab-row">
         <div class="tab active" onclick="setTab('all',this)">전체 <span id="cntAll"></span></div>
-        <div class="tab" onclick="setTab('답변완료',this)">답변완료 <span id="cnt답변완료"></span></div>
-        <div class="tab" onclick="setTab('검토필요',this)">검토필요 <span id="cnt검토필요"></span></div>
-        <div class="tab" onclick="setTab('오류신고',this)">오류신고 <span id="cnt오류신고"></span></div>
+        <div class="tab" onclick="setTab('done',this)">답변완료</div>
+        <div class="tab" onclick="setTab('processing',this)">처리중</div>
+        <div class="tab" onclick="setTab('error',this)">오류</div>
       </div>
       <div class="toolbar">
         <div class="search-box">
@@ -184,92 +184,83 @@
 <script src="_common.js"></script>
 <script>
 requireAdmin();
+let allQuestions = [];
 let activeTab = 'all';
 
-// 탭 카운트
-function updateCounts() {
-  document.getElementById('cntAll').textContent = `(${QUESTIONS.length})`;
-  ['답변완료','검토필요','오류신고'].forEach(s=>{
-    const el = document.getElementById('cnt'+s);
-    if(el) el.textContent = `(${QUESTIONS.filter(q=>q.status===s).length})`;
-  });
-}
-updateCounts();
-
-function setTab(tab, el) {
-  activeTab = tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
+async function loadQuestions() {
+  const category = document.getElementById('taxFilter').value;
+  const status = activeTab !== 'all' ? activeTab : '';
+  const params = new URLSearchParams({ page: 1 });
+  if (category) params.set('category', category);
+  if (status) params.set('status', status);
+  try {
+    const { questions } = await api('/api/admin/questions?' + params.toString());
+    allQuestions = questions;
+  } catch (e) {
+    allQuestions = [];
+    console.error('질문 로드 실패:', e);
+  }
+  document.getElementById('cntAll').textContent = `(${allQuestions.length})`;
   renderQ();
 }
 
-const Q_ANSWERS = {
-  1:'법인세법 제52조에 따라 부당행위계산 부인 규정 적용 요건은 ① 특수관계인 간 거래, ② 시가보다 낮거나 높은 가액으로 거래, ③ 법인의 소득 감소 또는 조세 부담 경감이 인정되는 경우입니다. 대법원 2021두52631에 따르면 시가 산정은 불특정 다수인 간 정상 거래 가격을 기준으로 합니다.',
-  2:'지방세법 제111조에 따라 공동주택 가격 산정에 이의가 있는 경우 과세기준일로부터 60일 이내에 이의신청이 가능합니다. 시가표준액 조정 시 적용 감면 규정은 지방세특례제한법 제92조에서 확인하시기 바랍니다.',
-  3:'소득세법 제119조 비거주자의 국내원천 양도소득에 대해 양도일이 속하는 달의 말일로부터 2개월 이내에 납세지 관할 세무서에 신고·납부해야 합니다.',
-  4:'부가가치세법 제15조 용역 공급 시기와 제32조 세금계산서 발급 시기가 상이한 경우, 실제 용역이 완료된 날 또는 대가 수령일 중 빠른 날을 공급 시기로 보아야 합니다. 다만 계속 공급 용역의 경우 별도 기준이 적용됩니다.',
-  5:'국세기본법 제81조의5 사전통지 생략 요건: ① 증거인멸 우려, ② 정기 조사 대상, ③ 탈세 제보가 있는 경우입니다. 사전통지 생략 시 조사 개시와 동시에 납세자 권리헌장을 교부해야 합니다.',
-  6:'법인세법 제45조 합병 시 피합병법인의 이월결손금 승계 한도는 피합병법인으로부터 승계한 사업에서 발생한 소득 범위 내로 제한됩니다. 다만 적격합병 요건을 충족하는 경우 전액 승계 가능합니다.',
-  7:'국세징수법 제92조에 따라 압류 재산 공매 시 배당 순위는 ① 강제집행 비용, ② 국세·가산금, ③ 담보권 있는 채권, ④ 일반 채권 순입니다. 다만 근저당권 설정 시기와 국세 납세의무 성립일에 따라 순위가 달라질 수 있습니다.',
-  8:'지방세법 제105조 과세기준일 현재 공부상 현황과 실질 현황이 다른 경우 실질 현황에 따라 과세합니다. 단, 정당한 사유가 있는 경우 납세자가 소명 자료를 제출하면 공부상 현황 적용 가능합니다.',
-  9:'법인세법 제44조 임원 퇴직금 한도 초과액은 손금 불산입 처리하고 귀속 임원에 대한 근로소득 또는 퇴직소득으로 소득 처분합니다.',
-  10:'지방세법 제110조 신축 건물의 시가표준액은 건물신축가격기준액 × 구조 지수 × 용도 지수 × 위치 지수 × 경과연수별 잔가율 × 면적으로 산정합니다.',
-};
-const Q_CONTENTS = {
-  1:'법인이 100% 자회사에 시가 10억원 상당의 주식을 5억원에 양도한 경우, 법인세법상 부당행위계산 부인 규정 적용 여부와 시가 산정 방법을 검토해 주십시오.',
-  2:'2025년 1월 신축된 공동주택의 공시가격이 인근 시세 대비 현저히 높게 산정된 것 같습니다. 이의신청 절차와 감면 가능성을 알고 싶습니다.',
-  3:'미국 국적 비거주자가 국내 소재 아파트를 양도하는 경우의 세금 신고 절차와 세율을 알고 싶습니다.',
-  4:'계약 체결은 3월에, 용역 완료는 5월에 된 경우 세금계산서를 언제 발급해야 하는지 문의드립니다.',
-  5:'납세자가 해외 도피 우려가 있는 경우 세무조사 사전통지를 생략할 수 있는지, 그 요건과 절차를 검토해 주십시오.',
-  6:'A법인이 B법인을 흡수합병하는 경우 B법인의 이월결손금 20억원을 전액 승계할 수 있는지 검토해 주십시오.',
-  7:'체납자 소유 부동산 공매 시 근저당권자와 압류 국세 중 누가 우선 배당받는지 검토해 주십시오.',
-  8:'공부상 창고로 등록되어 있으나 실제로는 주거용으로 사용되는 건물에 대한 재산세 과세 방법을 문의합니다.',
-  9:'임원 퇴직 시 정관에서 정한 퇴직금이 세법상 한도를 초과하는 경우 처리 방법을 알고 싶습니다.',
-  10:'2025년 3월 신축 완공된 건물의 재산세 과세표준 및 세율 적용 방법을 알려주십시오.',
-};
+function setTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadQuestions();
+}
 
 function renderQ() {
   const q = document.getElementById('qSearch').value.toLowerCase();
-  const tf = document.getElementById('taxFilter').value;
-  const filtered = QUESTIONS.filter(item=>{
-    const matchTab = activeTab==='all' || item.status===activeTab;
-    const matchQ = !q || item.title.toLowerCase().includes(q) || item.userName.includes(q);
-    const matchT = !tf || item.taxCategory===tf;
-    return matchTab && matchQ && matchT;
-  });
-  document.getElementById('qTbody').innerHTML = filtered.map(item=>`
+  const filtered = allQuestions.filter(item =>
+    !q || item.title.toLowerCase().includes(q) || (item.user_name||'').toLowerCase().includes(q)
+  );
+  document.getElementById('qTbody').innerHTML = filtered.map(item => `
     <tr>
       <td style="color:var(--text-muted);font-size:.76rem">${item.id}</td>
-      <td style="font-weight:600">${item.userName}</td>
-      <td><span class="status status-blue">${item.taxCategory}</span></td>
+      <td style="font-weight:600">${item.user_name||'-'}</td>
+      <td><span class="status status-blue">${item.tax_category}</span></td>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</td>
-      <td><span class="status status-${Q_STATUS_COLOR[item.status]}">${item.status}</span></td>
-      <td style="color:var(--text-muted);font-size:.78rem;white-space:nowrap">${item.createdAt}</td>
-      <td style="font-size:.78rem;color:var(--text-muted)">${item.answerTime}</td>
+      <td><span class="status status-${Q_STATUS_COLOR[item.status]||'blue'}">${Q_STATUS_LABEL[item.status]||item.status}</span></td>
+      <td style="color:var(--text-muted);font-size:.78rem;white-space:nowrap">${item.created_at ? item.created_at.replace('T',' ').split('.')[0] : '-'}</td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${item.answered_at ? '완료' : '-'}</td>
       <td><button class="action-btn view" onclick="openDetail(${item.id})">상세</button></td>
     </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">결과 없음</td></tr>';
 }
-renderQ();
 
-function openDetail(id) {
-  const q = QUESTIONS.find(x=>x.id===id);
-  document.getElementById('dpTitle').textContent = q.title;
-  document.getElementById('dpMeta').innerHTML = `
-    <span>회원: <strong>${q.userName}</strong></span>
-    <span>세목: <strong>${q.taxCategory}</strong></span>
-    <span>등록: <strong>${q.createdAt}</strong></span>
-    <span>답변시간: <strong>${q.answerTime}</strong></span>
-    <span>상태: <span class="status status-${Q_STATUS_COLOR[q.status]}">${q.status}</span></span>`;
-  document.getElementById('dpQ').textContent = Q_CONTENTS[id] || '(질문 내용)';
-  document.getElementById('dpA').textContent = Q_ANSWERS[id] || '(답변 내용)';
-  document.getElementById('dpRetryBtn').onclick = () => { alert('재답변 요청이 등록되었습니다.'); q.status='재답변완료'; renderQ(); };
-  document.getElementById('dpErrorBtn').onclick = () => { q.status='오류신고'; alert('오류가 표시되었습니다.'); renderQ(); openDetail(id); };
-  document.getElementById('detailPanel').classList.add('open');
-  document.getElementById('detailPanel').scrollIntoView({behavior:'smooth'});
+async function openDetail(id) {
+  try {
+    const { question, answer } = await api(`/api/questions/${id}`);
+    document.getElementById('dpTitle').textContent = question.title;
+    document.getElementById('dpMeta').innerHTML = `
+      <span>세목: <strong>${question.tax_category}</strong></span>
+      <span>등록: <strong>${question.created_at ? question.created_at.replace('T',' ').split('.')[0] : '-'}</strong></span>
+      <span>상태: <span class="status status-${Q_STATUS_COLOR[question.status]||'blue'}">${Q_STATUS_LABEL[question.status]||question.status}</span></span>`;
+    document.getElementById('dpQ').textContent = question.content || '(질문 내용 없음)';
+    document.getElementById('dpA').textContent = answer ? answer.content : '(아직 답변이 없습니다)';
+    document.getElementById('dpRetryBtn').onclick = () => changeQStatus(id, 'pending');
+    document.getElementById('dpErrorBtn').onclick = () => changeQStatus(id, 'error');
+    document.getElementById('detailPanel').classList.add('open');
+    document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    alert('상세 로드 실패: ' + e.message);
+  }
 }
+
+async function changeQStatus(id, status) {
+  try {
+    await api('/api/admin/questions', { method: 'PUT', body: JSON.stringify({ id, status }) });
+    closeDetail();
+    await loadQuestions();
+  } catch (e) { alert('상태 변경 실패: ' + e.message); }
+}
+
 function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
 }
+
+loadQuestions();
 </script>
 </body>
 </html>

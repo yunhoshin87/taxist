@@ -79,26 +79,52 @@
 </div>
 
 <script>
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('email').value;
   const pw = document.getElementById('pw').value;
   const btn = document.getElementById('loginBtn');
+  const alertBox = document.getElementById('alertBox');
   btn.textContent = '로그인 중...'; btn.disabled = true;
-  setTimeout(() => {
-    if (email === 'admin@taxist.kr' && pw === 'admin1234') {
-      localStorage.setItem('adminAuth', 'true');
-      localStorage.setItem('adminName', '관리자');
-      window.location.href = 'dashboard.html';
-    } else {
-      document.getElementById('alertBox').style.display = 'block';
+  alertBox.style.display = 'none';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pw }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alertBox.textContent = data.error || '로그인에 실패했습니다.';
+      alertBox.style.display = 'block';
       btn.textContent = '로그인'; btn.disabled = false;
+      return;
     }
-  }, 700);
+    if (data.user?.role !== 'admin') {
+      alertBox.textContent = '관리자 계정이 아닙니다.';
+      alertBox.style.display = 'block';
+      btn.textContent = '로그인'; btn.disabled = false;
+      return;
+    }
+    localStorage.setItem('taxist_token', data.token);
+    localStorage.setItem('taxist_user', JSON.stringify(data.user));
+    localStorage.setItem('adminName', data.user.name);
+    window.location.href = 'dashboard.html';
+  } catch {
+    alertBox.textContent = '서버 연결에 실패했습니다.';
+    alertBox.style.display = 'block';
+    btn.textContent = '로그인'; btn.disabled = false;
+  }
 }
-if (localStorage.getItem('adminAuth') === 'true') {
-  window.location.href = 'dashboard.html';
-}
+(function() {
+  const token = localStorage.getItem('taxist_token');
+  if (!token) return;
+  try {
+    const b64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const p = JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)));
+    if (p.role === 'admin' && p.exp > Date.now() / 1000) window.location.href = 'dashboard.html';
+  } catch {}
+})();
 </script>
 </body>
 </html>

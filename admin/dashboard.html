@@ -210,76 +210,85 @@ requireAdmin();
 document.getElementById('adminName').textContent = localStorage.getItem('adminName') || '관리자';
 document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 
-// Stats
-const activeCount = MEMBERS.filter(m=>m.status==='무료사용중').length;
-const expiredCount = MEMBERS.filter(m=>m.status==='무료기간만료').length;
-const totalQ = QUESTIONS.length;
-const doneQ = QUESTIONS.filter(q=>q.status==='답변완료').length;
-const statsData = [
-  {label:'전체 회원', val:MEMBERS.length, sub:'누적 가입자', badge:'', badgeClass:''},
-  {label:'이용중', val:activeCount, sub:'무료 사용 중', badge:'활성', badgeClass:'badge-green'},
-  {label:'만료/정지', val:expiredCount + MEMBERS.filter(m=>m.status==='이용정지').length, sub:'전환 필요', badge:'관리 필요', badgeClass:'badge-orange'},
-  {label:'총 질문', val:totalQ, sub:`답변완료 ${doneQ}건`, badge:`${Math.round(doneQ/totalQ*100)}%`, badgeClass:'badge-blue'},
-];
-document.getElementById('statsRow').innerHTML = statsData.map(s=>`
-  <div class="stat-card">
-    <div class="stat-label">${s.label}</div>
-    <div class="stat-val">${s.val}</div>
-    <div class="stat-sub">${s.sub}</div>
-    ${s.badge ? `<span class="stat-badge ${s.badgeClass}">${s.badge}</span>` : ''}
-  </div>`).join('');
-
-// Bar chart by tax category
-const catMap = {'법인세':0,'부가세':0,'조사':0,'징세':0,'재산세':0,'개인세':0};
-QUESTIONS.forEach(q=>{ if(catMap[q.taxCategory]!==undefined) catMap[q.taxCategory]++; });
-const maxCat = Math.max(...Object.values(catMap));
 const catColors = {'법인세':'#3B5BDB','부가세':'#0CA678','조사':'#F76707','징세':'#E64980','재산세':'#7048E8','개인세':'#1098AD'};
-document.getElementById('barList').innerHTML = Object.entries(catMap).map(([k,v])=>`
-  <div class="bar-item">
-    <div class="bar-label">${k}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${maxCat?v/maxCat*100:0}%;background:${catColors[k]}"></div></div>
-    <div class="bar-count">${v}</div>
-  </div>`).join('');
 
-// Expiring members (within 30 days)
-const today = new Date('2025-05-15');
-const expiring = MEMBERS.filter(m=>m.status==='무료사용중').map(m=>{
-  const end = new Date(m.trialEndsAt);
-  const days = Math.ceil((end-today)/(1000*60*60*24));
-  return {...m, daysLeft:days};
-}).filter(m=>m.daysLeft<=14).sort((a,b)=>a.daysLeft-b.daysLeft);
-document.getElementById('expiringList').innerHTML = expiring.length
-  ? expiring.map(m=>`
-    <div class="exp-item">
-      <div>
-        <div class="exp-name">${m.name}</div>
-        <div class="exp-org">${m.org}</div>
-      </div>
-      <div class="exp-days">${m.daysLeft}일 후</div>
-    </div>`).join('')
-  : '<p style="font-size:.83rem;color:var(--text-muted);text-align:center;padding:20px 0">만료 예정 회원 없음</p>';
+async function loadDashboard() {
+  const [{ members }, { questions }] = await Promise.all([
+    api('/api/admin/members'),
+    api('/api/admin/questions'),
+  ]);
 
-// Recent questions
-document.getElementById('recentQ').innerHTML = `
-  <thead><tr><th>회원</th><th>세목</th><th>제목</th><th>상태</th></tr></thead>
-  <tbody>${QUESTIONS.slice(0,5).map(q=>`
-  <tr>
-    <td>${q.userName}</td>
-    <td><span class="status status-blue">${q.taxCategory}</span></td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.title}</td>
-    <td><span class="status status-${Q_STATUS_COLOR[q.status]}">${q.status}</span></td>
-  </tr>`).join('')}</tbody>`;
+  const activeCount   = members.filter(m => m.status === 'trial').length;
+  const expiredCount  = members.filter(m => m.status === 'expired').length;
+  const suspendedCount = members.filter(m => m.status === 'suspended').length;
+  const doneQ = questions.filter(q => q.status === 'done').length;
+  const totalQ = questions.length;
 
-// Member table
-document.getElementById('memberTable').innerHTML = `
-  <thead><tr><th>이름</th><th>세목</th><th>질문수</th><th>상태</th></tr></thead>
-  <tbody>${MEMBERS.slice(0,6).map(m=>`
-  <tr>
-    <td>${m.name}</td>
-    <td style="font-size:.76rem;color:var(--text-muted)">${m.tax.join(', ')}</td>
-    <td style="font-weight:700">${m.questions}</td>
-    <td><span class="status status-${STATUS_COLOR[m.status]}">${STATUS_LABEL[m.status]}</span></td>
-  </tr>`).join('')}</tbody>`;
+  document.getElementById('statsRow').innerHTML = [
+    {label:'전체 회원', val:members.length, sub:'누적 가입자', badge:'', badgeClass:''},
+    {label:'이용중', val:activeCount, sub:'무료 사용 중', badge:'활성', badgeClass:'badge-green'},
+    {label:'만료/정지', val:expiredCount + suspendedCount, sub:'전환 필요', badge:'관리 필요', badgeClass:'badge-orange'},
+    {label:'총 질문', val:totalQ, sub:`답변완료 ${doneQ}건`, badge:totalQ ? Math.round(doneQ/totalQ*100)+'%' : '-', badgeClass:'badge-blue'},
+  ].map(s=>`
+    <div class="stat-card">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-val">${s.val}</div>
+      <div class="stat-sub">${s.sub}</div>
+      ${s.badge ? `<span class="stat-badge ${s.badgeClass}">${s.badge}</span>` : ''}
+    </div>`).join('');
+
+  const catMap = {'법인세':0,'부가세':0,'조사':0,'징세':0,'재산세':0,'개인세':0};
+  questions.forEach(q => { if (catMap[q.tax_category] !== undefined) catMap[q.tax_category]++; });
+  const maxCat = Math.max(...Object.values(catMap), 1);
+  document.getElementById('barList').innerHTML = Object.entries(catMap).map(([k,v]) => `
+    <div class="bar-item">
+      <div class="bar-label">${k}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${v/maxCat*100}%;background:${catColors[k]}"></div></div>
+      <div class="bar-count">${v}</div>
+    </div>`).join('');
+
+  const today = new Date();
+  const expiring = members
+    .filter(m => m.status === 'trial' && m.trial_ends_at)
+    .map(m => ({ ...m, daysLeft: Math.ceil((new Date(m.trial_ends_at) - today) / 86400000) }))
+    .filter(m => m.daysLeft <= 14)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+  document.getElementById('expiringList').innerHTML = expiring.length
+    ? expiring.map(m => `
+      <div class="exp-item">
+        <div>
+          <div class="exp-name">${m.name}</div>
+          <div class="exp-org">${m.org || ''}</div>
+        </div>
+        <div class="exp-days">${m.daysLeft}일 후</div>
+      </div>`).join('')
+    : '<p style="font-size:.83rem;color:var(--text-muted);text-align:center;padding:20px 0">만료 예정 회원 없음</p>';
+
+  document.getElementById('recentQ').innerHTML = `
+    <thead><tr><th>회원</th><th>세목</th><th>제목</th><th>상태</th></tr></thead>
+    <tbody>${questions.slice(0,5).map(q => `
+    <tr>
+      <td>${q.user_name || '-'}</td>
+      <td><span class="status status-blue">${q.tax_category}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.title}</td>
+      <td><span class="status status-${Q_STATUS_COLOR[q.status]||'blue'}">${Q_STATUS_LABEL[q.status]||q.status}</span></td>
+    </tr>`).join('')}</tbody>`;
+
+  document.getElementById('memberTable').innerHTML = `
+    <thead><tr><th>이름</th><th>세목</th><th>질문수</th><th>상태</th></tr></thead>
+    <tbody>${members.slice(0,6).map(m => `
+    <tr>
+      <td>${m.name}</td>
+      <td style="font-size:.76rem;color:var(--text-muted)">${(m.tax_categories||[]).join(', ')}</td>
+      <td style="font-weight:700">${m.question_count||0}</td>
+      <td><span class="status status-${STATUS_COLOR[m.status]||'blue'}">${STATUS_LABEL[m.status]||m.status}</span></td>
+    </tr>`).join('')}</tbody>`;
+}
+
+loadDashboard().catch(err => {
+  document.getElementById('statsRow').innerHTML =
+    `<div style="color:#DC2626;padding:12px;font-size:.85rem">데이터 로드 실패: ${err.message}</div>`;
+});
 </script>
 </body>
 </html>
