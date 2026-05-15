@@ -434,7 +434,7 @@
         <a href="#categories">세목별 서비스</a>
         <a href="#pricing">요금제</a>
       </div>
-      <div class="nav-cta">
+      <div class="nav-cta" id="navCta">
         <a href="login.html" class="btn btn-outline">로그인</a>
         <a href="signup.html" class="btn btn-coral">무료 시작하기</a>
       </div>
@@ -872,6 +872,15 @@
     el.style.transition = 'opacity .5s ease, transform .5s ease';
     observer.observe(el);
   });
+
+  /* 로그인 상태 반영 */
+  if (localStorage.getItem('userAuth') === 'true') {
+    document.getElementById('navCta').innerHTML =
+      `<a href="ask.html" class="btn btn-coral">질문하기</a>`;
+  } else if (localStorage.getItem('adminAuth') === 'true') {
+    document.getElementById('navCta').innerHTML =
+      `<a href="admin/dashboard.html" class="btn btn-coral">관리자 페이지</a>`;
+  }
 
   /* 네비게이션 active */
   const sections = document.querySelectorAll('section[id]');

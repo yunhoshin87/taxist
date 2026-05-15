@@ -156,9 +156,26 @@
         <button type="submit" class="btn-submit">로그인</button>
       </form>
 
-      <div class="divider"><span>또는</span></div>
+      <div class="divider"><span>테스트 계정</span></div>
 
-      <p class="signup-link">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button type="button" onclick="fillUser('test@taxist.kr','test1234')"
+          style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                 background:#F9FAFB;font-size:.85rem;font-family:inherit;cursor:pointer;
+                 text-align:left;color:var(--text);transition:border-color .2s"
+          onmouseover="this.style.borderColor='var(--navy)'" onmouseout="this.style.borderColor='var(--border)'">
+          👤 일반 사용자 — test@taxist.kr
+        </button>
+        <button type="button" onclick="fillUser('admin@taxist.kr','admin1234')"
+          style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                 background:#F9FAFB;font-size:.85rem;font-family:inherit;cursor:pointer;
+                 text-align:left;color:var(--text);transition:border-color .2s"
+          onmouseover="this.style.borderColor='var(--coral)'" onmouseout="this.style.borderColor='var(--border)'">
+          🔧 관리자 — admin@taxist.kr
+        </button>
+      </div>
+
+      <p class="signup-link" style="margin-top:20px">
         아직 계정이 없으신가요? <a href="signup.html">무료로 시작하기</a>
       </p>
     </div>
@@ -166,6 +183,10 @@
 </div>
 
 <script>
+function fillUser(email, pw) {
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = pw;
+}
 function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('email').value;
@@ -179,6 +200,15 @@ function handleLogin(e) {
       localStorage.setItem('adminAuth', 'true');
       localStorage.setItem('adminName', '관리자');
       window.location.href = 'admin/dashboard.html';
+      return;
+    }
+    if (email === 'test@taxist.kr' && password === 'test1234') {
+      localStorage.setItem('userAuth', 'true');
+      localStorage.setItem('userName', '김민준');
+      localStorage.setItem('userEmail', 'test@taxist.kr');
+      localStorage.setItem('userOrg', '서울지방국세청 법인세과');
+      localStorage.setItem('userTax', '법인세,부가세');
+      window.location.href = 'ask.html';
       return;
     }
     btn.textContent = '로그인';
