@@ -39,7 +39,14 @@ jobs:
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'update' }}
         env:
           LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
-        run: node scripts/fetch_all.mjs --update
+        run: |
+          echo "=== 환경 확인 ==="
+          node --version
+          echo "작업 디렉터리: $(pwd)"
+          echo "스크립트 존재 여부: $(ls scripts/fetch_all.mjs)"
+          echo "API 키 설정 여부: $(if [ -n "$LAW_API_KEY" ]; then echo '설정됨'; else echo '없음'; fi)"
+          echo "=== 실행 시작 ==="
+          node scripts/fetch_all.mjs --update
 
       - name: 변경사항 커밋 & 푸시
         run: |

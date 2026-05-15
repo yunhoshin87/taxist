@@ -9,6 +9,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// 잡히지 않는 예외도 출력
+process.on("uncaughtException", (e) => { console.error("UNCAUGHT:", e); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.error("UNHANDLED:", e); process.exit(1); });
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_DIR  = path.resolve(__dirname, "..");
 
@@ -324,6 +328,7 @@ function makeIndex(manifest) {
 
 // ── 메인 ────────────────────────────────────────────────────
 async function main() {
+  console.log("스크립트 시작 — Node:", process.version, "| IS_UPDATE:", IS_UPDATE, "| API_KEY 설정:", !!API_KEY);
   if (!API_KEY) {
     console.error("오류: API 키를 입력해주세요.\n사용법: node scripts/fetch_all.mjs 인증키");
     process.exit(1);
