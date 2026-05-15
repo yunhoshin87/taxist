@@ -832,7 +832,6 @@
           <li><a href="signup.html">회원가입</a></li>
           <li><a href="login.html">로그인</a></li>
           <li><a href="mypage.html">내 질문 목록</a></li>
-          <li><a href="admin/index.html">관리자</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -874,12 +873,13 @@
   });
 
   /* 로그인 상태 반영 */
-  if (localStorage.getItem('userAuth') === 'true') {
+  const _user = JSON.parse(localStorage.getItem('taxist_user') || 'null');
+  if (_user) {
+    const dest = _user.role === 'admin' ? 'admin/dashboard.html' : 'ask.html';
+    const label = _user.role === 'admin' ? '대시보드' : '질문하기';
     document.getElementById('navCta').innerHTML =
-      `<a href="ask.html" class="btn btn-coral">질문하기</a>`;
-  } else if (localStorage.getItem('adminAuth') === 'true') {
-    document.getElementById('navCta').innerHTML =
-      `<a href="admin/dashboard.html" class="btn btn-coral">관리자 페이지</a>`;
+      `<span style="font-size:.85rem;color:var(--text-muted)">${_user.name}님</span>
+       <a href="${dest}" class="btn btn-coral">${label}</a>`;
   }
 
   /* 네비게이션 active */
