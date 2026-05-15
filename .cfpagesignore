@@ -1,0 +1,16 @@
+# D1에 저장된 법령 데이터 - Pages 배포 불필요
+법령자료/
+판례자료/
+법인세자료/
+
+# 스크립트 및 개발 파일
+scripts/
+seed_data.sql
+seed_chunk_*.sql
+fetch_all.log
+*.py
+*.mjs
+requirements.txt
+
+# 기획 문서
+tax_officer_ai_service_plan.md

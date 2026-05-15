@@ -1,0 +1,37 @@
+name: Cloudflare Pages 배포
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "법령자료/**"
+      - "판례자료/**"
+      - "법인세자료/**"
+      - "scripts/**"
+      - "update_log.md"
+      - "law_manifest.json"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 웹 파일만 추출
+        run: |
+          mkdir deploy
+          cp -r functions deploy/
+          cp index.html login.html signup.html ask.html favicon.svg wrangler.toml deploy/ 2>/dev/null || true
+          cp -r admin deploy/ 2>/dev/null || true
+          echo "배포 파일 목록:"
+          find deploy -type f | sort
+
+      - name: Cloudflare Pages 배포
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 143f2323446f7c53f496c331d3f6ebd2
+          command: pages deploy deploy --project-name=taxist --branch=main
