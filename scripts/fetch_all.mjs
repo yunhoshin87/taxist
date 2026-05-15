@@ -12,8 +12,10 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_DIR  = path.resolve(__dirname, "..");
 
-const API_KEY   = process.argv[2] || process.env.LAW_API_KEY || "";
 const IS_UPDATE = process.argv.includes("--update");
+// --update 같은 플래그를 제외한 첫 번째 인수를 API 키로 사용
+const _args     = process.argv.slice(2).filter(a => !a.startsWith("--"));
+const API_KEY   = _args[0] || process.env.LAW_API_KEY || "";
 const BASE_URL  = "https://www.law.go.kr/DRF";
 const DELAY_MS  = 350;
 
