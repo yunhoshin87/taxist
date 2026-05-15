@@ -1,89 +1,58 @@
 name: 법령 일일 업데이트
 
 on:
-  # 매일 자정 KST (= 15:00 UTC)
   schedule:
-    - cron: "0 15 * * *"
-
-  # 수동 실행 (전체 재수집 or 증분 업데이트 선택 가능)
+    - cron: "0 15 * * *"   # 매일 자정 KST (= 15:00 UTC)
   workflow_dispatch:
     inputs:
       mode:
-        description: "실행 모드"
+        description: "full=전체재수집 / update=변경분만"
         required: true
         default: "update"
         type: choice
         options:
-          - update   # 변경사항만 (daily_update.py)
-          - full     # 전체 재수집 (fetch_laws.py)
+          - update
+          - full
 
 jobs:
-  update-laws:
+  update:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # 파일 커밋을 위한 권한
+      contents: write
 
     steps:
-      # 1. 소스 체크아웃
-      - name: 소스 체크아웃
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Python 설정
-      - name: Python 3.11 설정
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
           cache-dependency-path: scripts/requirements.txt
 
-      # 3. 의존성 설치
-      - name: 의존성 설치
-        run: pip install -r scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
 
-      # 4-A. 전체 재수집 (수동 full 모드)
-      - name: 전체 법령 수집
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'full' }}
+      - name: 전체 수집 (full)
+        if: ${{ inputs.mode == 'full' }}
         env:
           LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
-        run: python scripts/fetch_laws.py
+        run: python scripts/fetch_all.py
 
-      # 4-B. 증분 업데이트 (스케줄 or 수동 update 모드)
-      - name: 변경사항 업데이트
+      - name: 증분 업데이트 (update / schedule)
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'update' }}
-        id: update
         env:
           LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
-        run: python scripts/daily_update.py
+        run: python scripts/fetch_all.py --update
 
-      # 5. 변경된 파일이 있으면 커밋 & 푸시
-      - name: 변경사항 커밋
+      - name: 변경사항 커밋 & 푸시
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add 법령자료/ 판례자료/ law_manifest.json update_log.md 2>/dev/null || true
-
           if git diff --staged --quiet; then
-            echo "변경된 파일 없음 — 커밋 스킵"
+            echo "변경 없음 — 커밋 스킵"
           else
-            DATE=$(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST')
-            git commit -m "chore: 법령 자동 업데이트 ($DATE)"
+            git commit -m "chore: 법령 자동 업데이트 ($(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST'))"
             git push
-            echo "✅ 커밋 및 푸시 완료"
-          fi
-
-      # 6. 실행 결과 요약
-      - name: 실행 결과 요약
-        if: always()
-        run: |
-          echo "## 법령 업데이트 결과" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- 실행 시각: $(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST')" >> $GITHUB_STEP_SUMMARY
-          echo "- 모드: ${{ inputs.mode || 'schedule(update)' }}" >> $GITHUB_STEP_SUMMARY
-          if [ -f update_log.md ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 최근 업데이트 내역" >> $GITHUB_STEP_SUMMARY
-            tail -20 update_log.md >> $GITHUB_STEP_SUMMARY
           fi
