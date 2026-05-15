@@ -14,6 +14,9 @@ on:
           - update
           - full
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -22,28 +25,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: scripts/requirements.txt
-
-      - run: pip install -r scripts/requirements.txt
+      - name: Node.js 확인
+        run: node --version
 
       - name: 전체 수집 (full)
         if: ${{ inputs.mode == 'full' }}
         env:
           LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
-        run: python scripts/fetch_all.py
+        run: node scripts/fetch_all.mjs
 
       - name: 증분 업데이트 (update / schedule)
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'update' }}
         env:
           LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
-        run: python scripts/fetch_all.py --update
+        run: node scripts/fetch_all.mjs --update
 
       - name: 변경사항 커밋 & 푸시
         run: |
