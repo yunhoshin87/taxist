@@ -525,31 +525,31 @@
     "last_updated": "2026-05-15 04:24"
   },
   "prec_법인세": {
-    "count": 240,
-    "last_updated": "2026-05-16 00:32"
+    "count": 106,
+    "last_updated": "2026-05-16 01:46"
   },
   "prec_부가세": {
-    "count": 285,
-    "last_updated": "2026-05-16 00:32"
+    "count": 115,
+    "last_updated": "2026-05-16 01:47"
   },
   "prec_소득세": {
-    "count": 298,
-    "last_updated": "2026-05-16 00:33"
+    "count": 118,
+    "last_updated": "2026-05-16 01:47"
   },
   "prec_징세": {
-    "count": 276,
-    "last_updated": "2026-05-16 00:33"
+    "count": 116,
+    "last_updated": "2026-05-16 01:47"
   },
   "prec_재산세": {
-    "count": 276,
-    "last_updated": "2026-05-16 00:33"
+    "count": 120,
+    "last_updated": "2026-05-16 01:48"
   },
   "prec_조사": {
-    "count": 200,
-    "last_updated": "2026-05-16 00:33"
+    "count": 120,
+    "last_updated": "2026-05-16 01:48"
   },
   "prec_개인세": {
-    "count": 286,
-    "last_updated": "2026-05-16 00:33"
+    "count": 113,
+    "last_updated": "2026-05-16 01:48"
   }
 }
