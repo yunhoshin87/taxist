@@ -91,6 +91,10 @@ async function handleCreate({ request, env }) {
   } catch (e) {
     await env.DB.prepare("UPDATE questions SET status = 'error' WHERE id = ?")
       .bind(questionId).run();
+    // 오류 내용을 answers 테이블에 저장 (관리자 확인용)
+    const errMsg = `[ERROR] ${e.name || 'Error'}: ${e.message || String(e)}`;
+    await env.DB.prepare("INSERT INTO answers (question_id, content, sources) VALUES (?, ?, '[]')")
+      .bind(questionId, errMsg).run().catch(() => {});
     console.error("Answer generation error:", e);
     return json({ error: "답변 생성 중 오류가 발생했습니다: " + e.message }, 500);
   }

@@ -244,7 +244,13 @@ async function openDetail(id) {
       <span>등록: <strong>${question.created_at ? question.created_at.replace('T',' ').split('.')[0] : '-'}</strong></span>
       <span>상태: <span class="status status-${Q_STATUS_COLOR[question.status]||'blue'}">${Q_STATUS_LABEL[question.status]||question.status}</span></span>`;
     document.getElementById('dpQ').textContent = question.content || '(질문 내용 없음)';
-    document.getElementById('dpA').textContent = answer ? answer.content : '(아직 답변이 없습니다)';
+
+    if (question.status === 'error' && answer?.content?.startsWith('[ERROR]')) {
+      document.getElementById('dpA').innerHTML =
+        `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:12px 14px;font-size:.83rem;color:#DC2626;white-space:pre-wrap;font-family:monospace">${answer.content}</div>`;
+    } else {
+      document.getElementById('dpA').textContent = answer ? answer.content : '(아직 답변이 없습니다)';
+    }
     document.getElementById('dpRetryBtn').onclick = () => changeQStatus(id, 'pending');
     document.getElementById('dpErrorBtn').onclick = () => changeQStatus(id, 'error');
     document.getElementById('detailPanel').classList.add('open');

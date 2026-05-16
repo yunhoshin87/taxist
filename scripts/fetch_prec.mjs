@@ -97,8 +97,9 @@ async function apiGet(endpoint, params) {
   return null;
 }
 
-// ── 판례 목록 검색 ───────────────────────────────────────────
-async function searchPrec(keyword, maxCount = 100) {
+// ── 판례 목록 검색 ──────────────────────────────────────────
+// 반환: [{ 판례일련번호, 사건명, 사건번호, 선고일자, 법원명, 데이터출처명 }, ...]
+async function searchPrec(keyword, maxCount = 50) {
   const results = []; const seen = new Set();
   let page = 1;
   while (results.length < maxCount) {
@@ -108,36 +109,32 @@ async function searchPrec(keyword, maxCount = 100) {
       query:   keyword,
       display: "20",
       page:    String(page),
-      sort:    "ddes",   // 최신순
+      sort:    "ddes",
     });
-
-    if (!data) { log(`    API 응답 없음 — 키워드: "${keyword}"`); break; }
-
-    // 응답 구조 디버깅
+    if (!data) break;
     const wrap  = data["PrecSearch"] || data["precSearch"] || {};
-    const total = parseInt(wrap["totalCnt"] || wrap["totalcount"] || "0", 10);
+    const total = parseInt(wrap["totalCnt"] || "0", 10);
     let   items = wrap["prec"] || [];
     if (!Array.isArray(items)) items = items ? [items] : [];
-
-    if (page === 1) {
-      log(`    "${keyword}" → 전체 ${total}건 (이번 페이지 ${items.length}건)`);
-    }
-
+    if (page === 1) log(`    "${keyword}" → 전체 ${total}건`);
     for (const p of items) {
-      const pid = p["판례정보일련번호"] || p["prec_seq"] || JSON.stringify(p).slice(0, 40);
+      const pid = str(p["판례일련번호"]);   // ← 검색결과 필드명
       if (pid && !seen.has(pid)) { seen.add(pid); results.push(p); }
     }
-
-    if (!items.length || page * 20 >= Math.min(total, maxCount)) break;
+    if (!items.length || results.length >= maxCount || page * 20 >= Math.min(total, maxCount)) break;
     page++;
   }
   return results;
 }
 
-// ── 판례 상세 조회 (판결요지 등 추가 정보) ────────────────────
-async function fetchPrecDetail(seq) {
+// ── 판례 상세 조회 (대법원 판례만 가능) ──────────────────────
+async function fetchPrecDetail(precId) {
   await sleep(DELAY_MS);
-  return await apiGet("lawService.do", { target: "prec", MST: seq });
+  const data = await apiGet("lawService.do", { target: "prec", ID: precId }); // ← ID 파라미터
+  if (!data) return null;
+  const p = data["PrecService"] || data;
+  if (typeof p === "string" || !p["사건번호"]) return null; // "일치하는 판례 없음" 처리
+  return p;
 }
 
 // ── 판례 → MD 변환 ───────────────────────────────────────────
@@ -152,14 +149,16 @@ function precToMd(list, category) {
   ];
 
   list.forEach((p, i) => {
-    const 사건명   = str(p["사건명"]   || p["case_nm"]   || "");
-    const 사건번호  = str(p["사건번호"] || p["case_no"]   || "");
-    const 선고일자  = fmtDate(str(p["선고일자"] || p["judmt_date"] || ""));
-    const 법원     = str(p["법원명"]   || p["court_nm"]  || "");
-    const 판시사항  = str(p["판시사항"] || p["jdgmn_matter"] || "");
-    const 판결요지  = str(p["판결요지"] || p["jdgmn_summary"] || "");
-    const 참조조문  = str(p["참조조문"] || p["ref_clause"] || "");
-    const 참조판례  = str(p["참조판례"] || p["ref_prec"]   || "");
+    const 사건명  = str(p["사건명"]  || p["case_nm"]  || "");
+    const 사건번호 = str(p["사건번호"] || p["case_no"]  || "");
+    const 선고일자 = fmtDate(str(p["선고일자"] || ""));
+    const 법원    = str(p["법원명"]  || p["court_nm"] || "");
+    const 출처    = str(p["데이터출처명"] || "");
+    const 판시사항 = str(p["판시사항"] || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+    const 판결요지 = str(p["판결요지"] || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+    const 참조조문 = str(p["참조조문"] || "").replace(/<[^>]+>/g, "");
+    const 참조판례 = str(p["참조판례"] || "").replace(/<[^>]+>/g, "");
+    const 전문    = str(p["판례내용"] || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
 
     lines.push(`## ${i+1}. ${사건명}`, "");
     lines.push(`| 항목 | 내용 |`, `|---|---|`);
@@ -168,10 +167,14 @@ function precToMd(list, category) {
     if (법원)    lines.push(`| 법원     | ${법원} |`);
     lines.push("");
 
-    if (판시사항) { lines.push("**[판시사항]**", "", 판시사항, ""); }
-    if (판결요지) { lines.push("**[판결요지]**", "", 판결요지, ""); }
-    if (참조조문) { lines.push(`**참조조문:** ${참조조문}`, ""); }
-    if (참조판례) { lines.push(`**참조판례:** ${참조판례}`, ""); }
+    if (판시사항) lines.push("**[판시사항]**", "", 판시사항, "");
+    if (판결요지) lines.push("**[판결요지]**", "", 판결요지, "");
+    if (!판시사항 && !판결요지 && 전문) {
+      // 판시사항/판결요지 없으면 전문 앞부분
+      lines.push("**[판례내용]**", "", 전문.slice(0, 2000), "");
+    }
+    if (참조조문) lines.push(`**참조조문:** ${참조조문}`, "");
+    if (참조판례) lines.push(`**참조판례:** ${참조판례}`, "");
 
     lines.push("---", "");
   });
@@ -218,17 +221,36 @@ async function main() {
   for (const [category, keywords] of Object.entries(PREC_QUERIES)) {
     log(`\n[${category}] 판례 수집 중...`);
 
-    const all = []; const seen = new Set();
+    // 1단계: 키워드 검색 (기본 정보 수집)
+    const itemMap = new Map(); // 판례일련번호 → 검색결과 객체
     for (const kw of keywords) {
-      const items = await searchPrec(kw, 100);
+      const items = await searchPrec(kw, 50);
       for (const p of items) {
-        const id = str(p["판례정보일련번호"] || p["사건번호"] || JSON.stringify(p).slice(0,40));
-        if (!seen.has(id)) { seen.add(id); all.push(p); }
+        const pid = str(p["판례일련번호"]);
+        if (pid && !itemMap.has(pid)) itemMap.set(pid, p);
       }
-      if (all.length >= 200) break;
+      if (itemMap.size >= 100) break;
     }
+    log(`  → 검색결과 ${itemMap.size}건, 상세 조회 시작...`);
 
-    log(`  → ${category} 총 ${all.length}건 수집`);
+    // 2단계: 대법원 판례는 상세 조회, 나머지는 검색결과 기본정보 사용
+    const all = [];
+    let detailOk = 0, detailFail = 0;
+    for (const [pid, basic] of itemMap) {
+      const isDaebub = str(basic["데이터출처명"]).includes("대법원") ||
+                       str(basic["법원명"]).includes("대법원");
+      if (isDaebub) {
+        const detail = await fetchPrecDetail(pid);
+        if (detail) { all.push(detail); detailOk++; }
+        else        { all.push(basic);  detailFail++; }
+      } else {
+        all.push(basic);
+      }
+      if (all.length % 20 === 0) log(`    ${all.length}/${itemMap.size}건 처리중...`);
+    }
+    log(`  → 상세조회 성공 ${detailOk}건, 기본정보만 ${detailFail + (itemMap.size - detailOk - detailFail)}건`);
+
+    log(`  → ${category} 상세 ${all.length}건 완료`);
     if (!all.length) { log(`  ⚠️  수집 건수 0 — 스킵`); continue; }
 
     const md = precToMd(all, category);
