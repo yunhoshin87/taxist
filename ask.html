@@ -136,27 +136,58 @@
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     .sk-line{height:14px;border-radius:4px;margin-bottom:10px}
 
+    /* ── 답변 카드 ── */
     .ans-card{background:var(--bg-card);border:1px solid var(--border);
               border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px}
     .ans-header{background:var(--navy);padding:14px 20px;
-                display:flex;align-items:center;justify-content:space-between}
-    .ans-header-left{display:flex;align-items:center;gap:8px}
-    .ans-dot{width:8px;height:8px;border-radius:50%;background:#6EE7B7;animation:pulse 2s infinite}
+                display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .ans-header-left{display:flex;align-items:center;gap:8px;min-width:0}
+    .ans-dot{width:8px;height:8px;border-radius:50%;background:#6EE7B7;flex-shrink:0;
+             animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    .ans-header-title{font-size:.82rem;font-weight:600;color:rgba(255,255,255,.8)}
-    .ans-header-tag{font-size:.72rem;padding:3px 9px;border-radius:100px;
-                    background:rgba(224,91,75,.25);color:#FFA99D;font-weight:700}
-    .ans-body{padding:20px}
-    .ans-section{margin-bottom:18px}
-    .ans-section:last-child{margin-bottom:0}
-    .ans-section-label{font-size:.68rem;font-weight:800;letter-spacing:.1em;
-                       text-transform:uppercase;color:var(--coral);margin-bottom:8px}
-    .ans-section-body{font-size:.86rem;line-height:1.8;color:var(--text)}
-    .source-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .ans-header-title{font-size:.82rem;font-weight:600;color:rgba(255,255,255,.85)}
+    .ans-header-tag{font-size:.72rem;padding:3px 9px;border-radius:100px;flex-shrink:0;
+                    background:rgba(224,91,75,.3);color:#FFA99D;font-weight:700}
+
+    /* ── 보고서 본문 ── */
+    .ans-body{padding:24px 26px;font-size:.875rem;line-height:1.85;color:var(--text)}
+    .rpt-section{margin-bottom:26px}
+    .rpt-section:last-of-type{margin-bottom:0}
+    .rpt-h{display:flex;align-items:center;gap:8px;margin-bottom:12px;
+           padding-bottom:8px;border-bottom:2px solid var(--border)}
+    .rpt-h-num{font-size:.7rem;font-weight:800;color:#fff;background:var(--navy);
+               padding:2px 8px;border-radius:4px;flex-shrink:0;letter-spacing:.05em}
+    .rpt-h-text{font-size:.9rem;font-weight:800;color:var(--navy)}
+    .rpt-body p{margin:0 0 9px}
+    .rpt-body p:last-child{margin:0}
+    .rpt-subh{font-size:.81rem;font-weight:800;color:var(--navy-mid);
+              margin:14px 0 6px;padding-left:9px;border-left:3px solid var(--coral);display:block}
+    .rpt-cite{background:#F8FAFC;border-left:3px solid var(--navy-mid);
+              padding:9px 13px;margin:6px 0 12px;border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+              font-size:.82rem;color:#4B5563;line-height:1.7}
+    .rpt-interp{border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                padding:13px 15px;margin:8px 0 10px;background:#FAFAFA}
+    .rpt-interp-title{font-size:.81rem;font-weight:800;color:var(--coral);margin-bottom:5px}
+    .rpt-interp-basis{font-size:.74rem;color:var(--text-muted);
+                      padding:3px 8px;background:#F0F2F5;border-radius:4px;
+                      display:inline-block;margin-bottom:7px}
+    .rpt-interp-body{font-size:.84rem;line-height:1.75;color:var(--text)}
+    .rpt-list{list-style:none;padding:0;margin:6px 0}
+    .rpt-list li{padding:3px 0 3px 16px;position:relative;font-size:.84rem}
+    .rpt-list li::before{content:"•";position:absolute;left:3px;color:var(--coral);font-weight:700}
+    .rpt-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.8rem}
+    .rpt-table th{background:var(--navy);color:#fff;padding:8px 11px;
+                  text-align:left;font-size:.76rem;font-weight:700}
+    .rpt-table td{padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.6}
+    .rpt-table tr:hover td{background:#F9FAFB}
+    .rpt-table td:first-child{font-weight:600;color:var(--navy-mid);white-space:nowrap}
+
+    /* 출처·경고 */
+    .source-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
     .source-chip{font-size:.72rem;padding:3px 10px;border-radius:100px;
                  background:#EEF4FF;color:#3B5BDB;font-weight:600}
     .warning-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius-sm);
-                 padding:11px 14px;font-size:.78rem;color:#92400E;margin-top:4px}
+                 padding:11px 14px;font-size:.78rem;color:#92400E;line-height:1.6}
 
     .ans-actions{display:flex;gap:10px;padding:14px 20px;
                  border-top:1px solid var(--border);background:#FAFAFA;flex-wrap:wrap}
@@ -617,37 +648,175 @@ async function submitQuestion() {
   }
 }
 
-// ── 답변 렌더링 ──
-function renderMd(md) {
-  return md
-    .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:.95rem;color:var(--navy)">$1</h3>')
-    .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;font-size:.88rem">$1</h4>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^\|(.+)\|$/gm, (row) => {
-      if (/^[\s|:-]+$/.test(row)) return '';
-      const cells = row.split('|').slice(1,-1).map(c=>`<td style="padding:6px 10px;border:1px solid var(--border)">${c.trim()}</td>`).join('');
-      return `<tr>${cells}</tr>`;
-    })
-    .replace(/(<tr>.*<\/tr>\n?)+/gs, m => `<table style="width:100%;border-collapse:collapse;margin:8px 0">${m}</table>`)
-    .replace(/^---$/gm, '<hr style="margin:16px 0;border-color:var(--border)">')
-    .replace(/\n\n/g, '</p><p style="margin:0 0 8px">')
-    .replace(/\n/g, '<br>');
+// ── 보고서 렌더러 ──
+const SECTION_NUMS = { 'Ⅰ':'Ⅰ','Ⅱ':'Ⅱ','Ⅲ':'Ⅲ','Ⅳ':'Ⅳ','Ⅴ':'Ⅴ','Ⅵ':'Ⅵ','Ⅶ':'Ⅶ','Ⅷ':'Ⅷ' };
+
+function renderReport(md) {
+  const lines = md.split('\n');
+  let html = '';
+  let i = 0;
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function inlineFmt(s) {
+    return esc(s)
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/`(.+?)`/g,'<code style="background:#F3F4F6;padding:1px 4px;border-radius:3px;font-size:.82em">$1</code>');
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // 섹션 헤더: ## Ⅰ. 제목
+    const secMatch = line.match(/^##\s+([ⅠⅡⅢⅣⅤⅥⅦⅧ])\.\s+(.+)$/);
+    if (secMatch) {
+      html += `<div class="rpt-section"><div class="rpt-h">
+        <span class="rpt-h-num">${secMatch[1]}</span>
+        <span class="rpt-h-text">${esc(secMatch[2])}</span>
+      </div><div class="rpt-body">`;
+      i++;
+      // 섹션 끝까지 내용 수집
+      let body = '';
+      while (i < lines.length && !lines[i].match(/^##\s+[ⅠⅡⅢⅣⅤⅥⅦⅧ]\./)) {
+        body += lines[i] + '\n';
+        i++;
+      }
+      html += renderSectionBody(body);
+      html += '</div></div>';
+      continue;
+    }
+
+    // hr 구분선
+    if (/^---+$/.test(line.trim())) { html += '<hr style="margin:20px 0;border-color:var(--border)">'; i++; continue; }
+
+    // 그 외 텍스트
+    if (line.trim()) html += `<p style="margin:0 0 8px">${inlineFmt(line)}</p>`;
+    i++;
+  }
+  return html;
+}
+
+function renderSectionBody(text) {
+  let html = '';
+  const lines = text.split('\n');
+  let i = 0;
+  let tableRows = [];
+  let tableHeader = false;
+  let listItems = [];
+
+  function flushTable() {
+    if (!tableRows.length) return;
+    let t = '<table class="rpt-table">';
+    tableRows.forEach((row, idx) => {
+      const cells = row.split('|').slice(1,-1);
+      if (idx === 0) {
+        t += '<thead><tr>' + cells.map(c=>`<th>${esc(c.trim())}</th>`).join('') + '</tr></thead><tbody>';
+      } else {
+        t += '<tr>' + cells.map(c=>`<td>${inlineFmt(c.trim())}</td>`).join('') + '</tr>';
+      }
+    });
+    t += '</tbody></table>';
+    html += t;
+    tableRows = [];
+  }
+  function flushList() {
+    if (!listItems.length) return;
+    html += '<ul class="rpt-list">' + listItems.map(li=>`<li>${inlineFmt(li)}</li>`).join('') + '</ul>';
+    listItems = [];
+  }
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function inlineFmt(s){
+    return esc(s)
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/`(.+?)`/g,'<code style="background:#F3F4F6;padding:1px 4px;border-radius:3px;font-size:.82em">$1</code>');
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 소제목 **[항목]**
+    const subhMatch = trimmed.match(/^\*\*\[(.+?)\]\*\*$/);
+    if (subhMatch) {
+      flushTable(); flushList();
+      html += `<span class="rpt-subh">${esc(subhMatch[1])}</span>`;
+      i++; continue;
+    }
+
+    // 해석 가능성 블록: **[해석 N] 제목**
+    const interpMatch = trimmed.match(/^\*\*\[해석\s*(\d+)\]\s*(.+?)\*\*$/);
+    if (interpMatch) {
+      flushTable(); flushList();
+      // 다음 줄에서 > 근거: 읽기
+      let basis = '', body2 = '';
+      let j = i + 1;
+      if (j < lines.length && lines[j].trim().startsWith('> 근거:')) {
+        basis = lines[j].trim().replace(/^>\s*근거:\s*/, '');
+        j++;
+      }
+      while (j < lines.length && !lines[j].match(/^\*\*\[해석\s*\d+\]/)) {
+        body2 += lines[j] + '\n';
+        j++;
+      }
+      html += `<div class="rpt-interp">
+        <div class="rpt-interp-title">해석 ${interpMatch[1]}. ${esc(interpMatch[2])}</div>
+        ${basis ? `<div class="rpt-interp-basis">근거: ${esc(basis)}</div>` : ''}
+        <div class="rpt-interp-body">${inlineFmt(body2.trim())}</div>
+      </div>`;
+      i = j; continue;
+    }
+
+    // 인용블록 > 텍스트
+    if (trimmed.startsWith('> ')) {
+      flushTable(); flushList();
+      html += `<div class="rpt-cite">${inlineFmt(trimmed.slice(2))}</div>`;
+      i++; continue;
+    }
+
+    // 테이블 행
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushList();
+      if (/^[\s|:-]+$/.test(trimmed)) { i++; continue; } // 구분행 스킵
+      tableRows.push(trimmed);
+      i++; continue;
+    }
+
+    // 목록 - 항목
+    const liMatch = trimmed.match(/^[-•]\s+(.+)/);
+    if (liMatch) {
+      flushTable();
+      listItems.push(liMatch[1]);
+      i++; continue;
+    }
+
+    // 일반 텍스트
+    flushTable(); flushList();
+    if (trimmed) html += `<p style="margin:0 0 8px">${inlineFmt(trimmed)}</p>`;
+    i++;
+  }
+  flushTable(); flushList();
+  return html;
 }
 
 function showAnswer(tax, mdContent, sources) {
   document.getElementById('ansTaxTag').textContent = tax;
-  document.getElementById('ansBody').innerHTML = `
-    <div class="ans-section-body" style="font-size:.87rem;line-height:1.8">
-      <p style="margin:0 0 8px">${renderMd(mdContent)}</p>
-    </div>
-    ${sources.length ? `
-    <div class="ans-section" style="margin-top:16px">
-      <div class="ans-section-label">근거 자료 출처</div>
-      <div class="source-row">${sources.map(s=>`<span class="source-chip">📄 ${s}</span>`).join('')}</div>
-    </div>` : ''}
-    <div class="warning-box" style="margin-top:12px">
-      ⚠️ 본 답변은 AI가 생성한 참고용 검토 의견이며, 최종 법적 판단의 책임은 담당자에게 있습니다.
-    </div>`;
+
+  // ※ 면책 문구 분리
+  const parts = mdContent.split(/^---\s*\n※/m);
+  const body  = parts[0];
+  const note  = parts[1] ? '※' + parts[1].trim() : '';
+
+  document.getElementById('ansBody').innerHTML =
+    renderReport(body) +
+    (sources.length ? `
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;color:var(--coral);margin-bottom:8px">근거 자료</div>
+        <div class="source-row">${sources.map(s=>`<span class="source-chip">📄 ${s}</span>`).join('')}</div>
+      </div>` : '') +
+    (note ? `<div class="warning-box" style="margin-top:14px">⚠️ ${note}</div>` :
+      `<div class="warning-box" style="margin-top:14px">⚠️ 본 검토 보고서는 AI가 생성한 참고용 의견입니다. 최종 법적 판단의 책임은 담당자에게 있습니다.</div>`);
+
   document.getElementById('answerCard').style.display = 'block';
 }
 
