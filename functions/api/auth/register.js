@@ -8,12 +8,15 @@ export async function onRequestPost(context) {
     if (!name || !email || !password || !org || !tax_categories?.length)
       return json({ error: "필수 항목을 모두 입력해주세요" }, 400);
 
+    if (email.length < 3)
+      return json({ error: "아이디는 3자 이상이어야 합니다" }, 400);
+
     if (password.length < 8)
       return json({ error: "비밀번호는 8자 이상이어야 합니다" }, 400);
 
     const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
       .bind(email.toLowerCase()).first();
-    if (existing) return json({ error: "이미 사용 중인 이메일입니다" }, 409);
+    if (existing) return json({ error: "이미 사용 중인 아이디입니다" }, 409);
 
     const hash = await hashPassword(password);
     const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();

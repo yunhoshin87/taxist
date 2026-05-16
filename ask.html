@@ -136,6 +136,44 @@
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     .sk-line{height:14px;border-radius:4px;margin-bottom:10px}
 
+    /* ── 진행 상태 UI ── */
+    .progress-card{background:var(--bg-card);border:1px solid var(--border);
+                   border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px}
+    .progress-header{background:var(--navy);padding:14px 20px;
+                     display:flex;align-items:center;gap:10px}
+    .progress-header-dot{width:8px;height:8px;border-radius:50%;background:#FDE68A;
+                         animation:pulse 1s infinite;flex-shrink:0}
+    .progress-header-title{font-size:.82rem;font-weight:600;color:rgba(255,255,255,.85)}
+    .progress-steps{padding:20px 24px;display:flex;flex-direction:column;gap:0}
+    .prog-step{display:flex;align-items:flex-start;gap:12px;padding:12px 0;
+               border-bottom:1px solid var(--border);position:relative}
+    .prog-step:last-child{border-bottom:none}
+    .prog-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+               justify-content:center;font-size:.9rem;flex-shrink:0;
+               background:#F3F4F6;border:2px solid var(--border);transition:all .4s}
+    .prog-step.done .prog-icon{background:#DCFCE7;border-color:#16A34A;color:#16A34A}
+    .prog-step.active .prog-icon{background:var(--coral-light);border-color:var(--coral);
+                                  animation:pop .3s ease}
+    @keyframes pop{0%{transform:scale(.8)}100%{transform:scale(1)}}
+    .prog-text{flex:1;min-width:0}
+    .prog-label{font-size:.84rem;font-weight:700;color:var(--text-muted);transition:color .3s}
+    .prog-step.done .prog-label{color:#16A34A}
+    .prog-step.active .prog-label{color:var(--navy)}
+    .prog-detail{font-size:.76rem;color:var(--text-muted);margin-top:3px;
+                 min-height:18px;line-height:1.5;transition:all .3s}
+    .prog-step.active .prog-detail{color:var(--coral)}
+    .prog-spinner{display:inline-block;width:10px;height:10px;border:2px solid var(--coral-light);
+                  border-top-color:var(--coral);border-radius:50%;
+                  animation:spin .7s linear infinite;margin-right:5px;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .prog-badge{font-size:.7rem;padding:2px 8px;border-radius:100px;font-weight:700;
+                background:#DCFCE7;color:#16A34A;margin-left:6px}
+    .prog-doc-list{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+    .prog-doc-chip{font-size:.72rem;padding:2px 8px;border-radius:100px;
+                   background:#EEF4FF;color:#3B5BDB;font-weight:600;
+                   animation:fadeIn .3s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
     /* ── 답변 카드 ── */
     .ans-card{background:var(--bg-card);border:1px solid var(--border);
               border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px}
@@ -347,30 +385,53 @@
   <!-- ── 답변 영역 ── -->
   <div class="answer-col" id="answerCol">
 
-    <div id="loadingCard" class="ans-card" style="display:none">
-      <div class="ans-header">
-        <div class="ans-header-left">
-          <div class="ans-dot" style="background:#FDE68A"></div>
-          <span class="ans-header-title">AI 답변 생성 중...</span>
-        </div>
+    <div id="loadingCard" class="progress-card" style="display:none">
+      <div class="progress-header">
+        <div class="progress-header-dot"></div>
+        <span class="progress-header-title">AI 검토 보고서 작성 중...</span>
       </div>
-      <div class="ans-body">
-        <div style="margin-bottom:20px">
-          <div class="skeleton sk-line" style="width:40%;height:11px"></div>
-          <div class="skeleton sk-line" style="width:90%"></div>
-          <div class="skeleton sk-line" style="width:75%"></div>
+      <div class="progress-steps">
+
+        <div class="prog-step" id="ps1">
+          <div class="prog-icon">📝</div>
+          <div class="prog-text">
+            <div class="prog-label">질문 분석</div>
+            <div class="prog-detail" id="pd1">핵심 키워드 추출 중...</div>
+          </div>
         </div>
-        <div style="margin-bottom:20px">
-          <div class="skeleton sk-line" style="width:35%;height:11px"></div>
-          <div class="skeleton sk-line" style="width:85%"></div>
-          <div class="skeleton sk-line" style="width:60%"></div>
-          <div class="skeleton sk-line" style="width:78%"></div>
+
+        <div class="prog-step" id="ps2">
+          <div class="prog-icon">🔍</div>
+          <div class="prog-text">
+            <div class="prog-label">관련 자료 검색</div>
+            <div class="prog-detail" id="pd2">법령·판례·실무서 인덱스 검색 중...</div>
+          </div>
         </div>
-        <div>
-          <div class="skeleton sk-line" style="width:38%;height:11px"></div>
-          <div class="skeleton sk-line" style="width:92%"></div>
-          <div class="skeleton sk-line" style="width:50%"></div>
+
+        <div class="prog-step" id="ps3">
+          <div class="prog-icon">📚</div>
+          <div class="prog-text">
+            <div class="prog-label">자료 로딩</div>
+            <div class="prog-detail" id="pd3" class="prog-doc-list"></div>
+          </div>
         </div>
+
+        <div class="prog-step" id="ps4">
+          <div class="prog-icon">⚖️</div>
+          <div class="prog-text">
+            <div class="prog-label">법령 및 판례 검토</div>
+            <div class="prog-detail" id="pd4">관련 조문·판례 분석 중...</div>
+          </div>
+        </div>
+
+        <div class="prog-step" id="ps5">
+          <div class="prog-icon">✍️</div>
+          <div class="prog-text">
+            <div class="prog-label">보고서 작성</div>
+            <div class="prog-detail" id="pd5">해석 가능성 검토 및 종합 의견 작성 중...</div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -609,23 +670,84 @@ async function loadQuestion(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ── 진행 단계 애니메이션 ──
+let _progTimer = null;
+
+function resetProgress() {
+  [1,2,3,4,5].forEach(n => {
+    const s = document.getElementById('ps'+n);
+    s.classList.remove('active','done');
+  });
+}
+
+function setProgStep(n, detail = '') {
+  // 이전 단계 완료 표시
+  for (let i = 1; i < n; i++) {
+    const s = document.getElementById('ps'+i);
+    s.classList.remove('active');
+    s.classList.add('done');
+    s.querySelector('.prog-icon').textContent = '✓';
+  }
+  // 현재 단계 활성화
+  const cur = document.getElementById('ps'+n);
+  cur.classList.add('active');
+  if (detail) {
+    const d = document.getElementById('pd'+n);
+    d.innerHTML = `<span class="prog-spinner"></span>${detail}`;
+  }
+}
+
+function setProgDocs(sources) {
+  const d = document.getElementById('pd3');
+  if (!sources.length) { d.textContent = '관련 자료 로딩 완료'; return; }
+  d.innerHTML = `<div class="prog-doc-list">${
+    sources.slice(0,5).map(s => `<span class="prog-doc-chip">📄 ${s}</span>`).join('')
+  }</div>`;
+}
+
 // ── 질문 제출 ──
 async function submitQuestion() {
   const content = document.getElementById('editor').innerText.trim();
-  if (!document.getElementById('yearPeriod').value || !content) return;
+  if (currentType === '고충민원' && !document.getElementById('yearPeriod').value) return;
+  if (!content) return;
 
-  const title   = buildTitle();
-  const context = buildContext();
-  const fullContent = context + content;
+  const title       = buildTitle();
+  const ctx         = buildContext();
+  const fullContent = ctx + content;
 
   const btn = document.getElementById('submitBtn');
-  btn.textContent = 'AI 분석 중...';
+  btn.textContent = '분석 중...';
   btn.disabled = true;
 
+  // 답변 패널 즉시 열기
   document.getElementById('answerCol').classList.add('visible');
-  document.getElementById('loadingCard').style.display = 'block';
   document.getElementById('answerCard').style.display  = 'none';
+  document.getElementById('loadingCard').style.display = 'block';
   document.getElementById('page').classList.add('answer-visible');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // 우측으로 포커스 이동
+  document.getElementById('answerCol').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // 진행 단계 시뮬레이션
+  resetProgress();
+  setProgStep(1, '키워드 추출 및 질문 유형 분류 중...');
+
+  _progTimer = setTimeout(() => {
+    setProgStep(2, 'FTS5 인덱스에서 관련 법령·판례·실무서 검색 중...');
+  }, 1200);
+
+  _progTimer = setTimeout(() => {
+    setProgStep(3, '관련 자료 단락 추출 중...');
+  }, 3000);
+
+  _progTimer = setTimeout(() => {
+    setProgStep(4, '법령 조문 및 판례 관련성 분석 중...');
+  }, 6000);
+
+  _progTimer = setTimeout(() => {
+    setProgStep(5, '해석 가능성 검토 및 보고서 작성 중...');
+  }, 11000);
 
   try {
     const res  = await fetch('/api/questions', {
@@ -636,10 +758,25 @@ async function submitQuestion() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '오류가 발생했습니다');
 
-    document.getElementById('loadingCard').style.display = 'none';
-    showAnswer(selectedTax, data.answer.content, data.answer.sources || []);
+    // 완료 처리
+    clearTimeout(_progTimer);
+    setProgStep(5);
+    [1,2,3,4,5].forEach(n => {
+      const s = document.getElementById('ps'+n);
+      s.classList.remove('active');
+      s.classList.add('done');
+      s.querySelector('.prog-icon').textContent = '✓';
+    });
+    setProgDocs(data.answer?.sources || []);
+
+    setTimeout(() => {
+      document.getElementById('loadingCard').style.display = 'none';
+      showAnswer(selectedTax, data.answer.content, data.answer.sources || []);
+    }, 400);
+
     renderHistory();
   } catch (e) {
+    clearTimeout(_progTimer);
     document.getElementById('loadingCard').style.display = 'none';
     alert('답변 생성 실패: ' + e.message);
   } finally {
