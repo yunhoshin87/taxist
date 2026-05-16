@@ -120,6 +120,66 @@
                    background:white;border-radius:50%;transition:.3s}
     input:checked+.slider{background:var(--coral)}
     input:checked+.slider:before{transform:translateX(16px)}
+
+    /* 파일 행 체크박스 */
+    .file-row{cursor:pointer;transition:background .12s}
+    .file-row:hover{background:#F9FAFB}
+    .file-row.selected{background:#FFF0EE}
+    .file-check{width:18px;height:18px;accent-color:var(--coral);cursor:pointer;flex-shrink:0}
+
+    /* 선택 액션바 */
+    .sel-bar{display:none;align-items:center;gap:10px;padding:10px 14px;
+             background:#FFF0EE;border:1px solid #FECACA;border-radius:var(--radius-sm);
+             margin-bottom:12px;font-size:.83rem;color:var(--coral);font-weight:600}
+    .sel-bar.visible{display:flex}
+    .sel-bar-count{flex:1}
+    .sel-btn{padding:5px 12px;border-radius:var(--radius-sm);font-size:.76rem;font-weight:700;
+             cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+    .sel-btn-on{background:#10B981;color:#fff}
+    .sel-btn-on:hover{background:#059669}
+    .sel-btn-off{background:#6B7280;color:#fff}
+    .sel-btn-off:hover{background:#4B5563}
+    .sel-btn-clear{background:transparent;border:1px solid var(--coral)!important;color:var(--coral)}
+    .sel-btn-clear:hover{background:#FFF0EE}
+
+    /* 미리보기 팝업 */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+                   z-index:1000;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal{background:#fff;border-radius:var(--radius-md);width:min(860px,95vw);
+           max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
+           box-shadow:0 20px 60px rgba(0,0,0,.25)}
+    .modal-header{padding:16px 20px;border-bottom:1px solid var(--border);
+                  display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .modal-title{font-size:.95rem;font-weight:700;color:var(--navy);flex:1;
+                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .modal-badge{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:100px;
+                 background:#DBEAFE;color:#1E40AF;flex-shrink:0}
+    .modal-close{background:none;border:none;cursor:pointer;font-size:1.2rem;
+                 color:var(--text-muted);padding:4px;line-height:1;transition:color .15s}
+    .modal-close:hover{color:#DC2626}
+    .modal-body{padding:24px;overflow-y:auto;flex:1;font-size:.88rem;line-height:1.85;color:var(--text)}
+    .modal-body h1{font-size:1.1rem;font-weight:800;color:var(--navy);margin:0 0 16px;
+                   padding-bottom:10px;border-bottom:2px solid var(--coral)}
+    .modal-body h2{font-size:.95rem;font-weight:700;color:var(--navy);margin:20px 0 8px;
+                   padding-left:10px;border-left:3px solid var(--coral)}
+    .modal-body h3{font-size:.88rem;font-weight:700;color:var(--navy-mid);margin:14px 0 6px}
+    .modal-body h4{font-size:.84rem;font-weight:600;color:var(--text);margin:10px 0 4px}
+    .modal-body p{margin:0 0 8px}
+    .modal-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.82rem}
+    .modal-body th{background:var(--navy);color:#fff;padding:7px 10px;text-align:left;font-size:.78rem}
+    .modal-body td{padding:7px 10px;border-bottom:1px solid var(--border)}
+    .modal-body tr:hover td{background:#F9FAFB}
+    .modal-body hr{margin:16px 0;border:none;border-top:1px solid var(--border)}
+    .modal-body strong{font-weight:700}
+    .modal-body blockquote{border-left:3px solid var(--border);padding-left:12px;
+                           color:var(--text-muted);margin:8px 0;font-style:italic}
+    .modal-body code{background:#F3F4F6;padding:1px 5px;border-radius:3px;font-size:.83rem}
+    .modal-body ul,.modal-body ol{padding-left:20px;margin:6px 0}
+    .modal-body li{margin-bottom:3px}
+    .modal-loading{text-align:center;padding:60px;color:var(--text-muted);font-size:.9rem}
+    .modal-footer{padding:12px 20px;border-top:1px solid var(--border);
+                  display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;background:#FAFAFA}
   </style>
 </head>
 <body>
@@ -168,11 +228,19 @@
       <!-- 파일 목록 -->
       <div class="card">
         <div class="card-title">
-          <span id="panelTitle">세목을 선택하세요</span>
+          <span id="panelTitle">폴더를 선택하세요</span>
           <button class="btn-sm btn-navy" onclick="document.getElementById('fileInput').click()">📤 MD 업로드</button>
           <input type="file" id="fileInput" accept=".md" onchange="handleUpload(event)" />
         </div>
         <div class="breadcrumb" id="breadcrumb"></div>
+
+        <!-- 선택 액션바 -->
+        <div class="sel-bar" id="selBar">
+          <span class="sel-bar-count" id="selCount"></span>
+          <button class="sel-btn sel-btn-on"  onclick="bulkToggle(true)">활성화</button>
+          <button class="sel-btn sel-btn-off" onclick="bulkToggle(false)">비활성화</button>
+          <button class="sel-btn sel-btn-clear" onclick="clearSelection()">선택 해제</button>
+        </div>
 
         <!-- 업로드 가이드 (초기) -->
         <div id="uploadGuide">
@@ -189,7 +257,23 @@
 
         <div id="fileList"></div>
       </div>
+    </div>
+  </div>
+</div>
 
+<!-- ── 미리보기 팝업 ── -->
+<div class="modal-overlay" id="previewModal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle"></span>
+      <span class="modal-badge" id="modalBadge"></span>
+      <button class="modal-close" onclick="document.getElementById('previewModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="modal-loading">불러오는 중...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-outline" onclick="document.getElementById('previewModal').classList.remove('open')">닫기</button>
     </div>
   </div>
 </div>
@@ -197,9 +281,11 @@
 <script src="_common.js"></script>
 <script>
 requireAdmin();
-let allFolders = [];
+let allFolders      = [];
 let selectedFolderId = null;
+let selectedDocIds   = new Set();
 
+// ── 폴더 로드 ──
 async function loadFolders() {
   try {
     const { folders } = await api('/api/admin/folders');
@@ -212,6 +298,7 @@ async function loadFolders() {
   if (selectedFolderId) renderFileList(selectedFolderId);
 }
 
+// ── 폴더 트리 렌더 ──
 function renderTree() {
   document.getElementById('folderTree').innerHTML = allFolders.map(f => `
     <div class="folder-item">
@@ -230,38 +317,114 @@ function renderTree() {
 
 function selectFolder(fid) {
   selectedFolderId = fid;
+  selectedDocIds.clear();
   renderTree();
   renderFileList(fid);
 }
 
+// ── 파일 목록 렌더 ──
 function renderFileList(fid) {
   const folder = allFolders.find(f => f.id === fid);
   if (!folder) return;
   document.getElementById('panelTitle').textContent = folder.name;
-  document.getElementById('breadcrumb').innerHTML = `<span>자료</span> / <strong>${folder.name}</strong>`;
+  document.getElementById('breadcrumb').innerHTML =
+    `<span>자료</span> / <strong>${folder.name}</strong>`;
   document.getElementById('uploadGuide').style.display = 'none';
+  updateSelBar();
 
-  document.getElementById('fileList').innerHTML = folder.documents.length
-    ? folder.documents.map(doc => `
-      <div class="file-row">
-        <div class="file-icon">📄</div>
-        <div style="flex:1">
-          <div class="file-name">${doc.name}</div>
-          <div class="file-meta">수정일 ${doc.updated_at ? doc.updated_at.split('T')[0] : '-'}</div>
-          <div class="file-badges">
-            ${doc.is_active ? '<span class="fbadge fbadge-green">답변사용중</span>' : '<span class="fbadge fbadge-gray">비활성</span>'}
-          </div>
+  if (!folder.documents.length) {
+    document.getElementById('fileList').innerHTML =
+      '<div class="empty-state">📂 이 폴더에 파일이 없습니다.</div>';
+    return;
+  }
+
+  document.getElementById('fileList').innerHTML = folder.documents.map(doc => `
+    <div class="file-row ${selectedDocIds.has(doc.id) ? 'selected' : ''}"
+         id="row-${doc.id}" onclick="toggleSelect(event,${doc.id})">
+      <input class="file-check" type="checkbox" ${selectedDocIds.has(doc.id) ? 'checked' : ''}
+             onclick="event.stopPropagation();toggleSelect(event,${doc.id})" />
+      <div class="file-icon">📄</div>
+      <div style="flex:1;min-width:0">
+        <div class="file-name">${doc.name}</div>
+        <div class="file-meta">수정일 ${doc.updated_at ? doc.updated_at.split('T')[0] : '-'} · ${doc.tax_category || 'all'}</div>
+        <div class="file-badges">
+          ${doc.is_active
+            ? '<span class="fbadge fbadge-green">답변사용중</span>'
+            : '<span class="fbadge fbadge-gray">비활성</span>'}
         </div>
-        <div class="file-actions">
-          <label class="toggle-switch" title="답변에 사용 여부">
-            <input type="checkbox" ${doc.is_active ? 'checked' : ''} onchange="toggleDoc(${doc.id},this.checked)" />
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>`).join('')
-    : '<div class="empty-state">📂 이 폴더에 파일이 없습니다.</div>';
+      </div>
+      <div class="file-actions" onclick="event.stopPropagation()">
+        <button class="fbtn fbtn-blue" onclick="openPreview(${doc.id},'${esc(doc.name)}','${esc(doc.tax_category||'')}')">
+          미리보기
+        </button>
+        <label class="toggle-switch" title="답변에 사용 여부" style="margin-left:6px">
+          <input type="checkbox" ${doc.is_active ? 'checked' : ''}
+                 onchange="toggleDoc(${doc.id},this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>`).join('');
 }
 
+function esc(s) { return String(s || '').replace(/'/g, "\\'"); }
+
+// ── 개별 선택 ──
+function toggleSelect(e, docId) {
+  if (e.target.tagName === 'BUTTON' || e.target.closest('button') ||
+      e.target.tagName === 'INPUT' && e.target.type === 'checkbox' &&
+      !e.target.classList.contains('file-check')) return;
+
+  if (selectedDocIds.has(docId)) selectedDocIds.delete(docId);
+  else selectedDocIds.add(docId);
+
+  const row = document.getElementById(`row-${docId}`);
+  if (row) {
+    row.classList.toggle('selected', selectedDocIds.has(docId));
+    const cb = row.querySelector('.file-check');
+    if (cb) cb.checked = selectedDocIds.has(docId);
+  }
+  updateSelBar();
+}
+
+function updateSelBar() {
+  const bar = document.getElementById('selBar');
+  const cnt = selectedDocIds.size;
+  if (cnt > 0) {
+    bar.classList.add('visible');
+    document.getElementById('selCount').textContent = `${cnt}개 선택됨`;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function clearSelection() {
+  selectedDocIds.clear();
+  renderFileList(selectedFolderId);
+}
+
+// ── 일괄 활성/비활성 ──
+async function bulkToggle(is_active) {
+  if (!selectedDocIds.size) return;
+  const ids = [...selectedDocIds];
+  try {
+    await Promise.all(ids.map(id =>
+      api('/api/admin/folders', { method: 'POST', body: JSON.stringify({ doc_id: id, is_active }) })
+    ));
+    const folder = allFolders.find(f => f.id === selectedFolderId);
+    if (folder) {
+      folder.documents.forEach(d => {
+        if (selectedDocIds.has(d.id)) d.is_active = is_active ? 1 : 0;
+      });
+    }
+    selectedDocIds.clear();
+    renderFileList(selectedFolderId);
+  } catch (e) {
+    alert('변경 실패: ' + e.message);
+    await loadFolders();
+  }
+}
+
+// ── 개별 토글 ──
 async function toggleFolder(fid, is_active) {
   try {
     await api('/api/admin/folders', { method: 'PUT', body: JSON.stringify({ id: fid, is_active }) });
@@ -277,12 +440,72 @@ async function toggleDoc(doc_id, is_active) {
       const doc = folder.documents.find(d => d.id === doc_id);
       if (doc) doc.is_active = is_active ? 1 : 0;
     }
+    renderFileList(selectedFolderId);
   } catch (e) {
     alert('변경 실패: ' + e.message);
     await loadFolders();
   }
 }
 
+// ── 미리보기 팝업 ──
+async function openPreview(docId, name, taxCat) {
+  document.getElementById('modalTitle').textContent = name;
+  document.getElementById('modalBadge').textContent = taxCat || 'all';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="modal-loading">🔄 불러오는 중...</div>';
+  document.getElementById('previewModal').classList.add('open');
+
+  try {
+    const { doc } = await api(`/api/admin/folders?doc_id=${docId}`);
+    document.getElementById('modalBody').innerHTML = renderMd(doc.content || '(내용 없음)');
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML =
+      `<div class="modal-loading" style="color:#DC2626">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('previewModal'))
+    document.getElementById('previewModal').classList.remove('open');
+}
+
+// Esc 키로 닫기
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('previewModal').classList.remove('open');
+});
+
+// ── 간이 Markdown 렌더러 ──
+function renderMd(md) {
+  const escaped = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return escaped
+    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+    .replace(/`(.+?)`/g,       '<code>$1</code>')
+    .replace(/^> (.+)$/gm,     '<blockquote>$1</blockquote>')
+    .replace(/^---+$/gm,       '<hr>')
+    .replace(/^\| (.+) \|$/gm, row => {
+      if (/^[\s|:-]+$/.test(row)) return '';
+      const cells = row.split('|').slice(1, -1)
+        .map(c => `<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .replace(/(<tr>[\s\S]*?<\/tr>\n?)+/g, m => `<table>${m}</table>`)
+    .replace(/^- (.+)$/gm,  '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g,     '<br>');
+}
+
+// ── 업로드 ──
 function handleUpload(e) {
   const file = e.target.files[0];
   if (!file) return;

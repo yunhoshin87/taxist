@@ -14,7 +14,19 @@ export async function onRequest(context) {
 }
 
 // GET /api/admin/folders - 폴더 트리 + 문서 목록
-async function handleGet({ env }) {
+// GET /api/admin/folders?doc_id=X - 문서 내용 단건 조회
+async function handleGet({ request, env }) {
+  const url   = new URL(request.url);
+  const docId = url.searchParams.get("doc_id");
+
+  if (docId) {
+    const doc = await env.DB.prepare(
+      "SELECT id, name, content, tax_category, is_active, updated_at FROM documents WHERE id = ?"
+    ).bind(Number(docId)).first();
+    if (!doc) return json({ error: "문서 없음" }, 404);
+    return json({ doc });
+  }
+
   const { results: folders } = await env.DB.prepare(
     "SELECT * FROM folders ORDER BY sort_order ASC"
   ).all();
