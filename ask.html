@@ -41,29 +41,36 @@
           display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
     .page.answer-visible .form-col{position:sticky;top:80px}
 
-    /* ── FORM COL ── */
+    /* ── CARD ── */
     .card{background:var(--bg-card);border:1px solid var(--border);
           border-radius:var(--radius-md);padding:24px}
+    .card+.card{margin-top:14px}
     .card-title{font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:18px;
                 display:flex;align-items:center;gap:8px}
     .card-title span{font-size:1.1rem}
 
-    /* tax chips */
-    .tax-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-    .tax-chip{padding:7px 14px;border-radius:100px;font-size:.82rem;font-weight:700;
-              border:1.5px solid var(--border);background:#fff;cursor:pointer;
-              transition:all .2s;color:var(--text-muted)}
-    .tax-chip:hover{border-color:var(--navy);color:var(--navy)}
-    .tax-chip.selected{border-color:var(--coral);background:var(--coral-light);color:var(--coral)}
+    /* ── 세목 배지 ── */
+    .tax-badge{display:inline-flex;align-items:center;padding:5px 14px;border-radius:100px;
+               font-size:.82rem;font-weight:700;background:var(--coral-light);
+               color:var(--coral);border:1.5px solid var(--coral)}
 
-    /* title input */
-    .title-input{width:100%;padding:12px 14px;border:1.5px solid var(--border);
-                 border-radius:var(--radius-sm);font-size:.95rem;font-family:inherit;
-                 color:var(--text);background:var(--bg);transition:all .2s;margin-bottom:14px}
-    .title-input:focus{outline:none;border-color:var(--coral);
+    /* ── 관련세금 그리드 ── */
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field-group{display:flex;flex-direction:column;gap:5px}
+    .field-group.full{grid-column:1/-1}
+    .field-label{font-size:.75rem;font-weight:700;color:var(--navy)}
+    .field-input{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                 font-size:.88rem;font-family:inherit;color:var(--text);background:var(--bg);
+                 transition:all .2s;width:100%}
+    .field-input:focus{outline:none;border-color:var(--coral);
                        box-shadow:0 0 0 3px rgba(224,91,75,.1);background:#fff}
+    .field-input::placeholder{color:#9CA3AF}
+    select.field-input{cursor:pointer}
+    .field-readonly{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                    font-size:.88rem;background:#F8FAFC;color:var(--text-muted);
+                    display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:40px}
 
-    /* editor */
+    /* ── 에디터 ── */
     .editor-toolbar{display:flex;gap:4px;padding:8px 10px;background:var(--bg);
                     border:1.5px solid var(--border);border-radius:var(--radius-sm) var(--radius-sm) 0 0;
                     border-bottom:none;flex-wrap:wrap}
@@ -72,23 +79,41 @@
             transition:all .15s;font-family:inherit;color:var(--text)}
     .tb-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
     .tb-sep{width:1px;background:var(--border);margin:0 4px}
-    .editor{min-height:280px;padding:14px 16px;border:1.5px solid var(--border);
+    .editor{min-height:220px;padding:14px 16px;border:1.5px solid var(--border);
             border-radius:0 0 var(--radius-sm) var(--radius-sm);
             font-size:.9rem;line-height:1.75;outline:none;
-            background:#fff;overflow-y:auto;max-height:420px;
+            background:#fff;overflow-y:auto;max-height:360px;
             transition:border-color .2s}
     .editor:focus{border-color:var(--coral);box-shadow:0 0 0 3px rgba(224,91,75,.1)}
     .editor[data-placeholder]:empty::before{content:attr(data-placeholder);color:#9CA3AF;pointer-events:none}
     .editor table{width:100%;border-collapse:collapse;margin:8px 0}
     .editor td,.editor th{border:1px solid var(--border);padding:6px 10px;font-size:.85rem}
     .editor th{background:var(--bg);font-weight:700}
-
-    /* char count & draft */
     .editor-footer{display:flex;justify-content:space-between;align-items:center;
                    margin-top:6px;font-size:.76rem;color:var(--text-muted)}
 
-    /* submit */
-    .btn-submit{width:100%;padding:14px;border-radius:var(--radius-sm);margin-top:16px;
+    /* ── 첨부서류 ── */
+    .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);
+               padding:24px;text-align:center;cursor:pointer;transition:all .2s;
+               background:#FAFAFA}
+    .drop-zone:hover,.drop-zone.drag-over{border-color:var(--coral);background:var(--coral-light)}
+    .drop-zone-icon{font-size:1.8rem;margin-bottom:8px}
+    .drop-zone-text{font-size:.83rem;color:var(--text-muted);line-height:1.6}
+    .drop-zone-text strong{color:var(--coral)}
+    .file-list{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+    .file-item{display:flex;align-items:center;gap:10px;padding:8px 12px;
+               background:#F8FAFC;border:1px solid var(--border);border-radius:var(--radius-sm)}
+    .file-icon{font-size:1rem;flex-shrink:0}
+    .file-name{font-size:.82rem;font-weight:600;flex:1;overflow:hidden;
+               text-overflow:ellipsis;white-space:nowrap}
+    .file-size{font-size:.72rem;color:var(--text-muted);flex-shrink:0}
+    .file-remove{background:none;border:none;cursor:pointer;color:var(--text-muted);
+                 font-size:.9rem;padding:0 4px;transition:color .15s}
+    .file-remove:hover{color:#DC2626}
+    #fileInput{display:none}
+
+    /* ── 제출 버튼 ── */
+    .btn-submit{width:100%;padding:14px;border-radius:var(--radius-sm);margin-top:14px;
                 background:var(--coral);color:#fff;font-size:1rem;font-weight:700;
                 font-family:inherit;cursor:pointer;border:none;
                 box-shadow:0 2px 12px rgba(224,91,75,.3);transition:all .2s}
@@ -99,19 +124,16 @@
     .answer-col{display:none}
     .answer-col.visible{display:block}
 
-    /* skeleton loader */
     .skeleton{animation:shimmer 1.4s infinite linear;background:linear-gradient(90deg,#F3F4F6 25%,#E5E7EB 50%,#F3F4F6 75%);background-size:200% 100%;border-radius:6px}
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     .sk-line{height:14px;border-radius:4px;margin-bottom:10px}
 
-    /* answer card */
     .ans-card{background:var(--bg-card);border:1px solid var(--border);
               border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px}
     .ans-header{background:var(--navy);padding:14px 20px;
                 display:flex;align-items:center;justify-content:space-between}
     .ans-header-left{display:flex;align-items:center;gap:8px}
-    .ans-dot{width:8px;height:8px;border-radius:50%;background:#6EE7B7;
-             animation:pulse 2s infinite}
+    .ans-dot{width:8px;height:8px;border-radius:50%;background:#6EE7B7;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
     .ans-header-title{font-size:.82rem;font-weight:600;color:rgba(255,255,255,.8)}
     .ans-header-tag{font-size:.72rem;padding:3px 9px;border-radius:100px;
@@ -122,20 +144,12 @@
     .ans-section-label{font-size:.68rem;font-weight:800;letter-spacing:.1em;
                        text-transform:uppercase;color:var(--coral);margin-bottom:8px}
     .ans-section-body{font-size:.86rem;line-height:1.8;color:var(--text)}
-    .ans-section-body p{margin-bottom:8px}
-    .ans-section-body p:last-child{margin-bottom:0}
-    .ans-table{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:4px}
-    .ans-table th{background:var(--navy);color:#fff;padding:8px 12px;
-                  text-align:left;font-size:.75rem}
-    .ans-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text-muted)}
-    .ans-table tr:hover td{background:#F9FAFB}
     .source-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
     .source-chip{font-size:.72rem;padding:3px 10px;border-radius:100px;
                  background:#EEF4FF;color:#3B5BDB;font-weight:600}
     .warning-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius-sm);
                  padding:11px 14px;font-size:.78rem;color:#92400E;margin-top:4px}
 
-    /* action buttons */
     .ans-actions{display:flex;gap:10px;padding:14px 20px;
                  border-top:1px solid var(--border);background:#FAFAFA;flex-wrap:wrap}
     .act-btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:.82rem;
@@ -145,7 +159,7 @@
     .act-new{background:transparent;border:1.5px solid var(--border)!important;color:var(--text-muted)}
     .act-new:hover{border-color:var(--navy)!important;color:var(--navy)}
 
-    /* my-questions list */
+    /* ── 내 질문 목록 ── */
     .myq-item{display:flex;align-items:center;gap:12px;padding:12px 0;
               border-bottom:1px solid var(--border);cursor:pointer;transition:all .15s}
     .myq-item:last-child{border-bottom:none}
@@ -156,10 +170,10 @@
                overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .myq-date{font-size:.72rem;color:var(--text-muted);flex-shrink:0}
 
-    /* responsive */
     @media(max-width:900px){
       .page{grid-template-columns:1fr}
       .page.answer-visible .form-col{position:static}
+      .info-grid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -180,27 +194,59 @@
 
   <!-- ── 질문 작성 폼 ── -->
   <div class="form-col">
+
+    <!-- 관련세금 정보 -->
     <div class="card">
-      <div class="card-title"><span>✏️</span> 질문 작성</div>
+      <div class="card-title"><span>📋</span> 관련세금 정보</div>
+      <div class="info-grid">
 
-      <!-- 세목 선택 -->
-      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px">
-        세목 선택 <span style="color:var(--coral)">*</span>
+        <div class="field-group">
+          <span class="field-label">연도기분</span>
+          <select class="field-input" id="yearPeriod" onchange="checkReady()">
+            <option value="">선택</option>
+            <option>2025년</option>
+            <option>2024년</option>
+            <option>2023년</option>
+            <option>2022년</option>
+            <option>2021년</option>
+            <option>2020년</option>
+            <option>2019년</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">세목</span>
+          <div class="field-readonly" id="taxBadges"></div>
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">고지세액</span>
+          <input type="text" class="field-input" id="assessedAmount"
+                 placeholder="예: 1,000,000" oninput="fmtAmount(this)" />
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">청구세액</span>
+          <input type="text" class="field-input" id="claimedAmount"
+                 placeholder="예: 800,000" oninput="fmtAmount(this)" />
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">납부기한</span>
+          <input type="date" class="field-input" id="paymentDue" />
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">고지서 받은 날</span>
+          <input type="date" class="field-input" id="noticeDate" />
+        </div>
+
       </div>
-      <div class="tax-chips" id="taxChips">
-        <div class="tax-chip" onclick="selectTax(this,'법인세')">🏢 법인세</div>
-        <div class="tax-chip" onclick="selectTax(this,'부가세')">🧾 부가세</div>
-        <div class="tax-chip" onclick="selectTax(this,'조사')">🔎 조사</div>
-        <div class="tax-chip" onclick="selectTax(this,'징세')">📬 징세</div>
-        <div class="tax-chip" onclick="selectTax(this,'재산세')">🏠 재산세</div>
-        <div class="tax-chip" onclick="selectTax(this,'개인세')">👤 개인세</div>
-      </div>
+    </div>
 
-      <!-- 제목 -->
-      <input type="text" class="title-input" id="titleInput"
-             placeholder="질문 제목을 간략히 입력하세요" maxlength="100" />
-
-      <!-- 에디터 -->
+    <!-- 질문 내용 -->
+    <div class="card">
+      <div class="card-title"><span>✏️</span> 질문 내용</div>
       <div class="editor-toolbar">
         <button class="tb-btn" onclick="fmt('bold')"><b>B</b></button>
         <button class="tb-btn" onclick="fmt('italic')"><i>I</i></button>
@@ -212,29 +258,47 @@
         <button class="tb-btn" onclick="clearEditor()" style="color:#DC2626">초기화</button>
       </div>
       <div class="editor" id="editor" contenteditable="true"
-           data-placeholder="질문 내용을 입력하세요.&#10;&#10;엑셀·한글 표를 그대로 붙여넣기 할 수 있습니다.&#10;사실관계, 금액, 기간 등을 구체적으로 적을수록 정확한 답변을 받을 수 있습니다."
+           data-placeholder="질문 내용을 입력하세요.&#10;&#10;사실관계, 관련 법령, 쟁점 등을 구체적으로 적을수록 정확한 답변을 받을 수 있습니다."
            oninput="onEditorInput()"></div>
       <div class="editor-footer">
         <span id="charCount">0자</span>
         <span id="draftStatus"></span>
       </div>
-
-      <button class="btn-submit" id="submitBtn" onclick="submitQuestion()" disabled>
-        AI 답변 받기
-      </button>
     </div>
 
+    <!-- 첨부서류 -->
+    <div class="card">
+      <div class="card-title"><span>📎</span> 첨부서류</div>
+      <div class="drop-zone" id="dropZone"
+           onclick="document.getElementById('fileInput').click()"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <div class="drop-zone-icon">📂</div>
+        <div class="drop-zone-text">
+          <strong>클릭</strong>하거나 파일을 여기로 끌어다 놓으세요<br>
+          <span style="font-size:.75rem">PDF, 한글(HWP), Word, Excel, 이미지 등 · 파일당 최대 10MB</span>
+        </div>
+      </div>
+      <input type="file" id="fileInput" multiple
+             accept=".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+             onchange="onFileSelect(this.files)" />
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <button class="btn-submit" id="submitBtn" onclick="submitQuestion()" disabled>
+      AI 답변 받기
+    </button>
+
     <!-- 내 질문 목록 -->
-    <div class="card" id="myq" style="margin-top:16px">
+    <div class="card" id="myq" style="margin-top:14px">
       <div class="card-title"><span>📋</span> 내 질문 목록 <span id="myqCount" style="font-size:.78rem;color:var(--text-muted);font-weight:500"></span></div>
       <div id="myqList"></div>
     </div>
+
   </div>
 
   <!-- ── 답변 영역 ── -->
   <div class="answer-col" id="answerCol">
 
-    <!-- 로딩 skeleton -->
     <div id="loadingCard" class="ans-card" style="display:none">
       <div class="ans-header">
         <div class="ans-header-left">
@@ -262,7 +326,6 @@
       </div>
     </div>
 
-    <!-- 실제 답변 -->
     <div id="answerCard" class="ans-card" style="display:none">
       <div class="ans-header">
         <div class="ans-header-left">
@@ -283,7 +346,7 @@
 </div>
 
 <script>
-// ── 인증 체크 (JWT 기반) ──
+// ── 인증 체크 ──
 const _token = localStorage.getItem('taxist_token');
 const _user  = JSON.parse(localStorage.getItem('taxist_user') || 'null');
 if (!_token || !_user) { window.location.href = 'login.html'; }
@@ -292,27 +355,35 @@ document.getElementById('navName').textContent = _user?.name || '사용자';
 function doLogout() {
   localStorage.removeItem('taxist_token');
   localStorage.removeItem('taxist_user');
-  // 하위 호환
   localStorage.removeItem('userAuth');
   localStorage.removeItem('userName');
   window.location.href = 'index.html';
 }
 
-// ── 세목 선택 ──
-let selectedTax = '';
-function selectTax(el, tax) {
-  document.querySelectorAll('.tax-chip').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedTax = tax;
-  checkReady();
+// ── 세목: 회원가입 시 결정된 세목 표시 ──
+const _taxCategories = _user?.tax_categories || [];
+const selectedTax = _taxCategories[0] || '';
+
+(function renderTaxBadges() {
+  const el = document.getElementById('taxBadges');
+  if (!_taxCategories.length) {
+    el.innerHTML = '<span style="font-size:.82rem;color:var(--text-muted)">세목 정보 없음</span>';
+    return;
+  }
+  el.innerHTML = _taxCategories.map(t => `<span class="tax-badge">${t}</span>`).join('');
+})();
+
+// ── 금액 자동 포맷 (콤마) ──
+function fmtAmount(el) {
+  const raw = el.value.replace(/[^0-9]/g, '');
+  el.value = raw ? Number(raw).toLocaleString() : '';
 }
 
 // ── 에디터 ──
 function fmt(cmd) { document.execCommand(cmd, false, null); document.getElementById('editor').focus(); }
 function clearEditor() {
-  if(confirm('입력 내용을 모두 지우시겠습니까?')) {
+  if (confirm('입력 내용을 모두 지우시겠습니까?')) {
     document.getElementById('editor').innerHTML = '';
-    document.getElementById('titleInput').value = '';
     onEditorInput();
   }
 }
@@ -330,23 +401,108 @@ function onEditorInput() {
   checkReady();
   saveDraft();
 }
-function checkReady() {
-  const hasContent = (document.getElementById('editor').innerText || '').trim().length > 10;
-  const hasTitle = document.getElementById('titleInput').value.trim().length > 0;
-  document.getElementById('submitBtn').disabled = !(selectedTax && hasTitle && hasContent);
-}
-document.getElementById('titleInput').addEventListener('input', checkReady);
 
-// 임시저장
+function checkReady() {
+  const hasYear    = document.getElementById('yearPeriod').value !== '';
+  const hasContent = (document.getElementById('editor').innerText || '').trim().length > 10;
+  document.getElementById('submitBtn').disabled = !(hasYear && hasContent);
+}
+
 let draftTimer;
 function saveDraft() {
   clearTimeout(draftTimer);
-  draftTimer = setTimeout(()=>{
-    document.getElementById('draftStatus').textContent = '임시저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  draftTimer = setTimeout(() => {
+    document.getElementById('draftStatus').textContent =
+      '임시저장됨 ' + new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
   }, 1500);
 }
 
-// ── 질문 이력 (API 기반) ──
+// ── 첨부파일 ──
+let attachedFiles = [];
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  onFileSelect(e.dataTransfer.files);
+}
+function onFileSelect(files) {
+  const MAX = 10 * 1024 * 1024;
+  Array.from(files).forEach(f => {
+    if (f.size > MAX) { alert(`${f.name}\n파일 크기가 10MB를 초과합니다.`); return; }
+    if (attachedFiles.some(x => x.name === f.name)) return;
+    attachedFiles.push(f);
+  });
+  renderFileList();
+  document.getElementById('fileInput').value = '';
+}
+function removeFile(name) {
+  attachedFiles = attachedFiles.filter(f => f.name !== name);
+  renderFileList();
+}
+function renderFileList() {
+  const el = document.getElementById('fileList');
+  if (!attachedFiles.length) { el.innerHTML = ''; return; }
+  el.innerHTML = attachedFiles.map(f => `
+    <div class="file-item">
+      <span class="file-icon">${fileIcon(f.name)}</span>
+      <span class="file-name">${f.name}</span>
+      <span class="file-size">${fmtSize(f.size)}</span>
+      <button class="file-remove" onclick="removeFile('${f.name.replace(/'/g,"\\'")}')">✕</button>
+    </div>`).join('');
+}
+function fileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['pdf'].includes(ext)) return '📄';
+  if (['hwp','hwpx'].includes(ext)) return '📝';
+  if (['doc','docx'].includes(ext)) return '📃';
+  if (['xls','xlsx'].includes(ext)) return '📊';
+  if (['png','jpg','jpeg'].includes(ext)) return '🖼️';
+  return '📎';
+}
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+  return (bytes / 1024 / 1024).toFixed(1) + 'MB';
+}
+
+// ── 자동 제목 생성 ──
+function buildTitle() {
+  const year = document.getElementById('yearPeriod').value;
+  const tax  = selectedTax || (_taxCategories.join('/') || '');
+  const parts = [tax, year].filter(Boolean);
+  return parts.join(' ') || '질문';
+}
+
+// ── 구조화 정보를 질문 컨텍스트로 변환 ──
+function buildContext() {
+  const year     = document.getElementById('yearPeriod').value;
+  const assessed = document.getElementById('assessedAmount').value;
+  const claimed  = document.getElementById('claimedAmount').value;
+  const due      = document.getElementById('paymentDue').value;
+  const notice   = document.getElementById('noticeDate').value;
+  const tax      = _taxCategories.join(', ') || '-';
+  const files    = attachedFiles.map(f => f.name).join(', ') || '없음';
+
+  const rows = [
+    ['세목', tax],
+    ['연도기분', year || '-'],
+    ['고지세액', assessed ? assessed + '원' : '-'],
+    ['청구세액', claimed  ? claimed  + '원' : '-'],
+    ['납부기한', due     || '-'],
+    ['고지서받은날', notice  || '-'],
+    ['첨부서류', files],
+  ];
+  return '[관련세금 정보]\n' + rows.map(([k,v]) => `• ${k}: ${v}`).join('\n') + '\n\n';
+}
+
+// ── 질문 이력 ──
 async function renderHistory() {
   const container = document.getElementById('myqList');
   const countEl   = document.getElementById('myqCount');
@@ -375,11 +531,7 @@ async function loadQuestion(id) {
   const res  = await fetch(`/api/questions/${id}`, { headers: { Authorization: `Bearer ${_token}` } });
   const data = await res.json();
   if (!data.question) return;
-  document.getElementById('titleInput').value = data.question.title;
-  document.getElementById('editor').innerHTML  = data.question.content;
-  const cats = ['법인세','부가세','조사','징세','재산세','개인세'];
-  const idx  = cats.indexOf(data.question.tax_category);
-  if (idx >= 0) selectTax(document.querySelectorAll('.tax-chip')[idx], data.question.tax_category);
+  document.getElementById('editor').innerHTML = data.question.content;
   if (data.answer) {
     showAnswer(data.question.tax_category, data.answer.content, data.answer.sources || []);
     document.getElementById('page').classList.add('answer-visible');
@@ -387,11 +539,14 @@ async function loadQuestion(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── 답변 생성 (실제 API 호출) ──
+// ── 질문 제출 ──
 async function submitQuestion() {
-  const title   = document.getElementById('titleInput').value.trim();
   const content = document.getElementById('editor').innerText.trim();
-  if (!selectedTax || !title || !content) return;
+  if (!document.getElementById('yearPeriod').value || !content) return;
+
+  const title   = buildTitle();
+  const context = buildContext();
+  const fullContent = context + content;
 
   const btn = document.getElementById('submitBtn');
   btn.textContent = 'AI 분석 중...';
@@ -406,7 +561,7 @@ async function submitQuestion() {
     const res  = await fetch('/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_token}` },
-      body: JSON.stringify({ tax_category: selectedTax, title, content }),
+      body: JSON.stringify({ tax_category: selectedTax, title, content: fullContent }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '오류가 발생했습니다');
@@ -423,7 +578,7 @@ async function submitQuestion() {
   }
 }
 
-// Markdown 간이 렌더러
+// ── 답변 렌더링 ──
 function renderMd(md) {
   return md
     .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:.95rem;color:var(--navy)">$1</h3>')
@@ -459,22 +614,25 @@ function showAnswer(tax, mdContent, sources) {
 
 function copyAnswer() {
   const text = document.getElementById('ansBody').innerText;
-  navigator.clipboard.writeText(text).then(()=>alert('답변이 클립보드에 복사되었습니다.'));
+  navigator.clipboard.writeText(text).then(() => alert('답변이 클립보드에 복사되었습니다.'));
 }
-function printAnswer() {
-  window.print();
-}
+function printAnswer() { window.print(); }
+
 function newQuestion() {
   document.getElementById('editor').innerHTML = '';
-  document.getElementById('titleInput').value = '';
-  document.querySelectorAll('.tax-chip').forEach(c=>c.classList.remove('selected'));
-  selectedTax = '';
+  document.getElementById('yearPeriod').value = '';
+  document.getElementById('assessedAmount').value = '';
+  document.getElementById('claimedAmount').value = '';
+  document.getElementById('paymentDue').value = '';
+  document.getElementById('noticeDate').value = '';
+  attachedFiles = [];
+  renderFileList();
   document.getElementById('answerCard').style.display = 'none';
   document.getElementById('answerCol').classList.remove('visible');
   document.getElementById('page').classList.remove('answer-visible');
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('charCount').textContent = '0자';
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 </script>
 </body>

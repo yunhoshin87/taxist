@@ -523,5 +523,33 @@
     "공포일자": "2026-03-20",
     "folder": "국제조세",
     "last_updated": "2026-05-15 04:24"
+  },
+  "prec_법인세": {
+    "count": 240,
+    "last_updated": "2026-05-16 00:32"
+  },
+  "prec_부가세": {
+    "count": 285,
+    "last_updated": "2026-05-16 00:32"
+  },
+  "prec_소득세": {
+    "count": 298,
+    "last_updated": "2026-05-16 00:33"
+  },
+  "prec_징세": {
+    "count": 276,
+    "last_updated": "2026-05-16 00:33"
+  },
+  "prec_재산세": {
+    "count": 276,
+    "last_updated": "2026-05-16 00:33"
+  },
+  "prec_조사": {
+    "count": 200,
+    "last_updated": "2026-05-16 00:33"
+  },
+  "prec_개인세": {
+    "count": 286,
+    "last_updated": "2026-05-16 00:33"
   }
 }
