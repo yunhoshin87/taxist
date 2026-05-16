@@ -1,6 +1,6 @@
 // Gemini API 답변 생성
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 export async function generateAnswer(question, taxCategory, documents, apiKey) {
   const docText = documents.length
