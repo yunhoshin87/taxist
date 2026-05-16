@@ -62,8 +62,8 @@ async function handleCreate({ request, env }) {
   const questionId = qResult.meta.last_row_id;
 
   try {
-    // 활성 폴더 기반 문서 로드
-    const documents = await loadDocuments(env.DB, tax_category);
+    // 질문 키워드 기반 관련 문서 로드 (FTS5)
+    const documents = await loadDocuments(env.DB, tax_category, content);
 
     // Gemini 답변 생성
     const { content: answerContent, sources } = await generateAnswer(

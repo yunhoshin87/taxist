@@ -64,10 +64,18 @@ async function d1Query(sql, params = []) {
 
 async function insertDoc(folderId, name, filePath, content, taxCategory) {
   const truncated = content.slice(0, MAX_CONTENT);
-  await d1Query(
+  const res = await d1Query(
     "INSERT OR IGNORE INTO documents (folder_id, name, file_path, content, tax_category, is_active) VALUES (?, ?, ?, ?, ?, 1)",
     [folderId, name, filePath, truncated, taxCategory]
   );
+  // FTS5 인덱스 동기화
+  const docId = res?.result?.[0]?.meta?.last_row_id;
+  if (docId) {
+    await d1Query(
+      "INSERT OR REPLACE INTO documents_fts(rowid, content) VALUES (?, ?)",
+      [docId, truncated]
+    ).catch(() => {});
+  }
 }
 
 async function main() {
