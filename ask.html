@@ -54,6 +54,14 @@
                font-size:.82rem;font-weight:700;background:var(--coral-light);
                color:var(--coral);border:1.5px solid var(--coral)}
 
+    /* ── 질문 유형 선택 ── */
+    .type-selector{display:flex;gap:8px;margin-bottom:4px}
+    .type-btn{flex:1;padding:10px 0;border-radius:var(--radius-sm);font-size:.88rem;font-weight:700;
+              font-family:inherit;cursor:pointer;border:2px solid var(--border);
+              background:#fff;color:var(--text-muted);transition:all .2s;text-align:center}
+    .type-btn:hover{border-color:var(--navy);color:var(--navy)}
+    .type-btn.active{border-color:var(--coral);background:var(--coral-light);color:var(--coral)}
+
     /* ── 관련세금 그리드 ── */
     .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .field-group{display:flex;flex-direction:column;gap:5px}
@@ -195,8 +203,17 @@
   <!-- ── 질문 작성 폼 ── -->
   <div class="form-col">
 
-    <!-- 관련세금 정보 -->
-    <div class="card">
+    <!-- 질문 유형 선택 -->
+    <div class="card" style="padding:16px 20px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:10px">질문 유형</div>
+      <div class="type-selector">
+        <button class="type-btn active" id="typeBtn일반" onclick="setType('일반')">일반</button>
+        <button class="type-btn" id="typeBtn고충민원" onclick="setType('고충민원')">고충민원</button>
+      </div>
+    </div>
+
+    <!-- 관련세금 정보 (고충민원 전용) -->
+    <div class="card" id="cardTaxInfo" style="display:none">
       <div class="card-title"><span>📋</span> 관련세금 정보</div>
       <div class="info-grid">
 
@@ -360,6 +377,17 @@ function doLogout() {
   window.location.href = 'index.html';
 }
 
+// ── 질문 유형 ──
+let currentType = '일반';
+
+function setType(type) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('typeBtn' + type).classList.add('active');
+  document.getElementById('cardTaxInfo').style.display = (type === '고충민원') ? '' : 'none';
+  checkReady();
+}
+
 // ── 세목: 회원가입 시 결정된 세목 표시 ──
 const _taxCategories = _user?.tax_categories || [];
 const selectedTax = _taxCategories[0] || '';
@@ -403,8 +431,10 @@ function onEditorInput() {
 }
 
 function checkReady() {
-  const hasYear    = document.getElementById('yearPeriod').value !== '';
   const hasContent = (document.getElementById('editor').innerText || '').trim().length > 10;
+  const hasYear    = currentType === '고충민원'
+    ? document.getElementById('yearPeriod').value !== ''
+    : true;
   document.getElementById('submitBtn').disabled = !(hasYear && hasContent);
 }
 
@@ -474,32 +504,41 @@ function fmtSize(bytes) {
 
 // ── 자동 제목 생성 ──
 function buildTitle() {
-  const year = document.getElementById('yearPeriod').value;
-  const tax  = selectedTax || (_taxCategories.join('/') || '');
-  const parts = [tax, year].filter(Boolean);
-  return parts.join(' ') || '질문';
+  const tax = selectedTax || (_taxCategories.join('/') || '');
+  if (currentType === '고충민원') {
+    const year = document.getElementById('yearPeriod').value;
+    return ['고충민원', tax, year].filter(Boolean).join(' ');
+  }
+  return ['일반질문', tax].filter(Boolean).join(' ') || '질문';
 }
 
 // ── 구조화 정보를 질문 컨텍스트로 변환 ──
 function buildContext() {
-  const year     = document.getElementById('yearPeriod').value;
-  const assessed = document.getElementById('assessedAmount').value;
-  const claimed  = document.getElementById('claimedAmount').value;
-  const due      = document.getElementById('paymentDue').value;
-  const notice   = document.getElementById('noticeDate').value;
-  const tax      = _taxCategories.join(', ') || '-';
-  const files    = attachedFiles.map(f => f.name).join(', ') || '없음';
+  const files = attachedFiles.map(f => f.name).join(', ') || '없음';
 
-  const rows = [
-    ['세목', tax],
-    ['연도기분', year || '-'],
-    ['고지세액', assessed ? assessed + '원' : '-'],
-    ['청구세액', claimed  ? claimed  + '원' : '-'],
-    ['납부기한', due     || '-'],
-    ['고지서받은날', notice  || '-'],
-    ['첨부서류', files],
-  ];
-  return '[관련세금 정보]\n' + rows.map(([k,v]) => `• ${k}: ${v}`).join('\n') + '\n\n';
+  if (currentType === '고충민원') {
+    const year     = document.getElementById('yearPeriod').value;
+    const assessed = document.getElementById('assessedAmount').value;
+    const claimed  = document.getElementById('claimedAmount').value;
+    const due      = document.getElementById('paymentDue').value;
+    const notice   = document.getElementById('noticeDate').value;
+    const tax      = _taxCategories.join(', ') || '-';
+    const rows = [
+      ['질문유형', '고충민원'],
+      ['세목', tax],
+      ['연도기분', year || '-'],
+      ['고지세액', assessed ? assessed + '원' : '-'],
+      ['청구세액', claimed  ? claimed  + '원' : '-'],
+      ['납부기한', due     || '-'],
+      ['고지서받은날', notice  || '-'],
+      ['첨부서류', files],
+    ];
+    return '[관련세금 정보]\n' + rows.map(([k,v]) => `• ${k}: ${v}`).join('\n') + '\n\n';
+  }
+
+  // 일반: 첨부파일 정보만 포함
+  const tax = _taxCategories.join(', ') || '-';
+  return `[질문유형: 일반 | 세목: ${tax}${files !== '없음' ? ' | 첨부: ' + files : ''}]\n\n`;
 }
 
 // ── 질문 이력 ──
@@ -620,11 +659,12 @@ function printAnswer() { window.print(); }
 
 function newQuestion() {
   document.getElementById('editor').innerHTML = '';
-  document.getElementById('yearPeriod').value = '';
+  document.getElementById('yearPeriod').value    = '';
   document.getElementById('assessedAmount').value = '';
-  document.getElementById('claimedAmount').value = '';
-  document.getElementById('paymentDue').value = '';
-  document.getElementById('noticeDate').value = '';
+  document.getElementById('claimedAmount').value  = '';
+  document.getElementById('paymentDue').value     = '';
+  document.getElementById('noticeDate').value     = '';
+  setType('일반');
   attachedFiles = [];
   renderFileList();
   document.getElementById('answerCard').style.display = 'none';
