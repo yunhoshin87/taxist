@@ -47,6 +47,9 @@ function extractRelevantSections(content, keywords, maxChars = 1800) {
     .map(p => p.trim())
     .filter(p => p.length > 40);
 
+  // 문서번호 포함 단락은 가산점 (서면-, 재정경제부, 조심, 과세기준 등)
+  const docNoRe = /서면[-\s]|재정경제부|기획재정부|법인세제과|조심\s*\d|국심|과세기준|사전답변/;
+
   // 각 단락을 키워드 히트 수로 스코링
   const scored = paragraphs.map(p => {
     const lower = p.toLowerCase();
@@ -54,7 +57,8 @@ function extractRelevantSections(content, keywords, maxChars = 1800) {
       const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
       return n + (lower.match(re) || []).length;
     }, 0);
-    return { text: p, hits };
+    const bonus = docNoRe.test(p) ? 1 : 0;
+    return { text: p, hits: hits + bonus };
   });
 
   // 히트 수 기준 정렬 후 maxChars까지 수집
@@ -83,6 +87,20 @@ const CATEGORY_MAP = {
   '징세':    ['국세기본', '불복절차', '해석례-징세'],
   '재산세':  ['지방세', '종합부동산세', '국세기본', '불복절차', '해석례-재산세'],
   '개인세':  ['소득세', '상속증여세', '국세기본', '조세특례', '불복절차', '해석례-개인세'],
+};
+
+// ── 해석례 폴더 ID 범위 (seed_interp.mjs 기준) ───────────────
+const INTERP_FOLDER_IDS = [20, 21, 22, 23, 24, 25, 26, 27]; // 해석례-부가세~해석례-법인세
+
+// ── 세목별 해석례 폴더 ID 매핑 ──────────────────────────────
+const INTERP_FOLDER_MAP = {
+  '법인세': [27],
+  '부가세': [20],
+  '소득세': [21],
+  '징세':   [22],
+  '재산세': [23],
+  '조사':   [24],
+  '개인세': [25],
 };
 
 // ── 메인: 문서 로딩 ───────────────────────────────────────────
@@ -123,9 +141,34 @@ export async function loadDocuments(db, taxCategory, question = '') {
         docs = results.sort((a, b) => (rankMap[a.id] || 0) - (rankMap[b.id] || 0));
       }
     } catch (e) {
-      // FTS5 실패 시 폴백으로 진행
       console.error('FTS search failed:', e?.message);
     }
+  }
+
+  // ── 1.5순위: 해석례 폴더 직접 포함 (해당 세목 해석례 항상 추가) ──
+  try {
+    const interpFolderIds = INTERP_FOLDER_MAP[taxCategory] || [];
+    if (interpFolderIds.length > 0) {
+      const interpPlaceholders = interpFolderIds.map(() => '?').join(',');
+      const { results: interpDocs } = await db.prepare(`
+        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+        FROM documents d
+        JOIN folders f ON d.folder_id = f.id
+        WHERE d.folder_id IN (${interpPlaceholders})
+          AND d.is_active = 1
+          AND f.is_active = 1
+          AND d.content IS NOT NULL
+        ORDER BY d.updated_at DESC
+        LIMIT 4
+      `).bind(...interpFolderIds).all();
+
+      const existing = new Set(docs.map(d => d.id));
+      for (const r of interpDocs) {
+        if (!existing.has(r.id)) docs.push(r);
+      }
+    }
+  } catch (e) {
+    console.error('Interp folder search failed:', e?.message);
   }
 
   // ── 2순위: 세목 기반 폴백 (FTS 결과 없을 때) ─────────────────

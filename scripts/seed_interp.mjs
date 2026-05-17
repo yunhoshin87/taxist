@@ -26,7 +26,7 @@ const MAX_CONTENT = 50000;
 
 // 해석례 폴더 ID 매핑 (schema.sql id=19부터 시작)
 const INTERP_FOLDERS = {
-  "법인세": { id: 19, tax: "법인세" },
+  "법인세": { id: 27, tax: "법인세" },   // id=19는 판례-조사로 충돌, 27 사용
   "부가세": { id: 20, tax: "부가세" },
   "소득세": { id: 21, tax: "개인세" },
   "징세":   { id: 22, tax: "징세" },
