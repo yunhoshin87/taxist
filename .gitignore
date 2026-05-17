@@ -13,4 +13,16 @@ desktop.ini
 # Node (향후 빌드 도구 사용 시)
 node_modules/
 dist/
+dist_deploy/
 .env
+
+# 대용량 데이터 파일 (D1에 저장)
+해석례자료/
+법령자료/
+판례자료/
+법인세자료/
+
+# 체크포인트 및 매니페스트
+taxlaw_checkpoint.json
+law_manifest.json
+seed_summary_manifest.json

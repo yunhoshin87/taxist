@@ -1,4 +1,4 @@
-// 질문 키워드 기반 관련 문서 검색 (FTS5 + 단락 스코링)
+// 질문 키워드 기반 관련 문서 검색 (FTS5 + 단락 스코링 + NTS 온디맨드 상세 캐싱)
 
 // ── 한국어 불용어 ──────────────────────────────────────────────
 const STOPWORDS = new Set([
@@ -85,6 +85,85 @@ function extractRelevantSections(content, keywords, maxChars = 1800) {
   return sections.join('\n\n');
 }
 
+// ── NTS 온디맨드 상세 조회 (요약 문서 → 전문 캐싱) ───────────
+
+const NTS_HOST = "https://taxlaw.nts.go.kr";
+
+async function getNtsSession() {
+  try {
+    const res = await fetch(`${NTS_HOST}/qt/USEQTA001L.do?ntstDcmClCd=02`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+      },
+    });
+    const cookie = res.headers.get("set-cookie") || "";
+    return cookie.split(";")[0]; // JSESSIONID=...
+  } catch {
+    return null;
+  }
+}
+
+async function fetchNtsDetail(ntsDocId, cookie) {
+  try {
+    const body = new URLSearchParams({
+      actionId: "ASIQTB002PR01",
+      paramData: JSON.stringify({ dcmDVO: { ntstDcmId: ntsDocId } }),
+    });
+    const res = await fetch(`${NTS_HOST}/action.do`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "application/json, */*; q=0.01",
+        "Referer": `${NTS_HOST}/qt/USEQTA001L.do?ntstDcmClCd=02`,
+        "Origin": NTS_HOST,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      body: body.toString(),
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (!text || text.trimStart().startsWith("<!")) return null;
+    const json = JSON.parse(text);
+    if (json.status !== "SUCCESS") return null;
+    return (json.data?.["ASIQTB002PR01"] || json.data)?.dcmDVO || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildFullContent(dvo, fallbackContent) {
+  const strip = (s) => (s || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+
+  const title   = strip(dvo.ntstDcmTtl || "");
+  const docNo   = strip(dvo.ntstDcmDscmCntn || "");
+  const date    = (dvo.ntstDcmRgtDt || "").replace(/(\d{4})(\d{2})(\d{2}).*/, "$1-$2-$3");
+  const tax     = strip(dvo.ntstTlawClNm || "");
+  const gist    = strip(dvo.ntstDcmGistCntn || "");
+  const answer  = strip(dvo.ntstDcmCntn || "");
+  const keyword = strip(dvo.ntstDcmMatrCntn || "");
+
+  if (!answer && !gist) return fallbackContent;
+
+  const lines = [`# ${title || "해석례"}`, ""];
+  lines.push("| 항목 | 내용 |", "|---|---|");
+  if (docNo)   lines.push(`| 문서번호 | ${docNo} |`);
+  if (date)    lines.push(`| 등록일   | ${date} |`);
+  if (tax)     lines.push(`| 세목     | ${tax} |`);
+  if (keyword) lines.push(`| 키워드   | ${keyword.slice(0, 100)} |`);
+  lines.push("");
+  if (gist) {
+    lines.push("## 질의요지", "", gist, "");
+  }
+  if (answer) {
+    lines.push("## 회신", "", answer, "");
+  }
+  return lines.join("\n");
+}
+
 // ── 세목-폴더 매핑 (폴백용) ────────────────────────────────────
 const CATEGORY_MAP = {
   '법인세':  ['법인세', '국세기본', '조세특례', '국제조세', '불복절차', '해석례-법인세'],
@@ -140,7 +219,8 @@ export async function loadDocuments(db, taxCategory, question = '') {
         const placeholders = ids.map(() => '?').join(',');
 
         const { results } = await db.prepare(`
-          SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+          SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
+                 d.nts_doc_id, d.is_summary
           FROM documents d
           JOIN folders f ON d.folder_id = f.id
           WHERE d.id IN (${placeholders})
@@ -163,7 +243,8 @@ export async function loadDocuments(db, taxCategory, question = '') {
     if (interpIds.length > 0) {
       const ph = interpIds.map(() => '?').join(',');
       const { results: interpDocs } = await db.prepare(`
-        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
+               d.nts_doc_id, d.is_summary
         FROM documents d
         JOIN folders f ON d.folder_id = f.id
         WHERE d.folder_id IN (${ph})
@@ -186,7 +267,8 @@ export async function loadDocuments(db, taxCategory, question = '') {
     if (precIds.length > 0) {
       const ph = precIds.map(() => '?').join(',');
       const { results: precDocs } = await db.prepare(`
-        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
+               d.nts_doc_id, d.is_summary
         FROM documents d
         JOIN folders f ON d.folder_id = f.id
         WHERE d.folder_id IN (${ph})
@@ -213,7 +295,8 @@ export async function loadDocuments(db, taxCategory, question = '') {
     ];
 
     const { results } = await db.prepare(`
-      SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+      SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
+             d.nts_doc_id, d.is_summary
       FROM documents d
       JOIN folders f ON d.folder_id = f.id
       WHERE f.is_active = 1 AND d.is_active = 1 AND d.content IS NOT NULL
@@ -227,6 +310,38 @@ export async function loadDocuments(db, taxCategory, question = '') {
     const existing = new Set(docs.map(d => d.id));
     for (const r of results) {
       if (!existing.has(r.id)) docs.push(r);
+    }
+  }
+
+  // ── 온디맨드 NTS 상세 조회 (is_summary=1 문서에 대해) ────────
+  const summaryDocs = docs.filter(d => d.is_summary && d.nts_doc_id);
+  if (summaryDocs.length > 0) {
+    try {
+      const cookie = await getNtsSession();
+      if (cookie) {
+        // 최대 5건 병렬 조회
+        const toFetch = summaryDocs.slice(0, 5);
+        const results = await Promise.allSettled(
+          toFetch.map(d => fetchNtsDetail(d.nts_doc_id, cookie))
+        );
+        for (let i = 0; i < toFetch.length; i++) {
+          const r = results[i];
+          if (r.status === 'fulfilled' && r.value) {
+            const fullContent = buildFullContent(r.value, toFetch[i].content);
+            // D1 캐시 업데이트 (다음 질문부터는 즉시 사용)
+            try {
+              await db.prepare(
+                'UPDATE documents SET content = ?, is_summary = 0 WHERE id = ?'
+              ).bind(fullContent, toFetch[i].id).run();
+            } catch { /* 캐시 실패는 무시 */ }
+            // 현재 요청에 즉시 반영
+            const doc = docs.find(d => d.id === toFetch[i].id);
+            if (doc) doc.content = fullContent;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('NTS 온디맨드 조회 오류:', e?.message);
     }
   }
 
