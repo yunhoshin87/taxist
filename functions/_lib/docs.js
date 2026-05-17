@@ -41,16 +41,26 @@ function ftsEscape(kw) {
 function extractRelevantSections(content, keywords, maxChars = 1800) {
   if (!content) return '';
 
-  // 단락 분리 (법령 조문 단위, 판례 항목 단위)
-  const paragraphs = content
-    .split(/\n{2,}|(?=\n##\s)|(?=\n###\s)/)
-    .map(p => p.trim())
-    .filter(p => p.length > 40);
+  // 판례 파일 감지: "## N. 사건명" 패턴이면 케이스 단위로 분리
+  // 사건번호 테이블 + 판시사항 + 판결요지가 한 단위로 추출되어야 함
+  const isPrecDoc = /^## \d+\./m.test(content);
 
-  // 문서번호 포함 단락은 가산점 (서면-, 재정경제부, 조심, 과세기준 등)
-  const docNoRe = /서면[-\s]|재정경제부|기획재정부|법인세제과|조심\s*\d|국심|과세기준|사전답변/;
+  let paragraphs;
+  if (isPrecDoc) {
+    paragraphs = content
+      .split(/(?=^## \d+\.)/m)
+      .map(p => p.trim())
+      .filter(p => p.length > 60);
+  } else {
+    paragraphs = content
+      .split(/\n{2,}|(?=\n##\s)|(?=\n###\s)/)
+      .map(p => p.trim())
+      .filter(p => p.length > 40);
+  }
 
-  // 각 단락을 키워드 히트 수로 스코링
+  // 문서번호·사건번호 포함 단락 가산점
+  const docNoRe = /서면[-\s]|재정경제부|기획재정부|법인세제과|조심\s*\d|국심|과세기준|사전답변|대법원\s*\d{4}|사건번호|선고일자/;
+
   const scored = paragraphs.map(p => {
     const lower = p.toLowerCase();
     const hits = keywords.reduce((n, kw) => {
@@ -61,25 +71,21 @@ function extractRelevantSections(content, keywords, maxChars = 1800) {
     return { text: p, hits: hits + bonus };
   });
 
-  // 히트 수 기준 정렬 후 maxChars까지 수집
   const sorted = [...scored].sort((a, b) => b.hits - a.hits);
   const sections = [];
   let total = 0;
   for (const s of sorted) {
-    if (s.hits === 0) break; // 히트 없는 단락은 제외
+    if (s.hits === 0) break;
     if (total + s.text.length > maxChars) break;
     sections.push(s.text);
     total += s.text.length;
   }
 
-  // 관련 단락이 없으면 앞부분 반환
   if (!sections.length) return content.slice(0, maxChars);
-
   return sections.join('\n\n');
 }
 
 // ── 세목-폴더 매핑 (폴백용) ────────────────────────────────────
-// 법령·판례 외에 해석례(해석례-세목) 폴더도 포함
 const CATEGORY_MAP = {
   '법인세':  ['법인세', '국세기본', '조세특례', '국제조세', '불복절차', '해석례-법인세'],
   '부가세':  ['부가세', '국세기본', '조세특례', '불복절차', '해석례-부가세'],
@@ -88,9 +94,6 @@ const CATEGORY_MAP = {
   '재산세':  ['지방세', '종합부동산세', '국세기본', '불복절차', '해석례-재산세'],
   '개인세':  ['소득세', '상속증여세', '국세기본', '조세특례', '불복절차', '해석례-개인세'],
 };
-
-// ── 해석례 폴더 ID 범위 (seed_interp.mjs 기준) ───────────────
-const INTERP_FOLDER_IDS = [20, 21, 22, 23, 24, 25, 26, 27]; // 해석례-부가세~해석례-법인세
 
 // ── 세목별 해석례 폴더 ID 매핑 ──────────────────────────────
 const INTERP_FOLDER_MAP = {
@@ -103,6 +106,17 @@ const INTERP_FOLDER_MAP = {
   '개인세': [25],
 };
 
+// ── 세목별 판례 폴더 ID 매핑 ────────────────────────────────
+const PREC_FOLDER_MAP = {
+  '법인세': [13],
+  '부가세': [14],
+  '소득세': [15],
+  '개인세': [15],
+  '징세':   [16],
+  '재산세': [17],
+  '조사':   [16],
+};
+
 // ── 메인: 문서 로딩 ───────────────────────────────────────────
 export async function loadDocuments(db, taxCategory, question = '') {
   const keywords = question ? extractKeywords(question) : [];
@@ -113,7 +127,6 @@ export async function loadDocuments(db, taxCategory, question = '') {
     try {
       const ftsQuery = keywords.map(ftsEscape).join(' OR ');
 
-      // FTS5로 관련 문서 rowid 획득 (rank = BM25 관련도)
       const { results: ftsRows } = await db.prepare(`
         SELECT f.rowid AS doc_id, rank
         FROM documents_fts f
@@ -136,7 +149,6 @@ export async function loadDocuments(db, taxCategory, question = '') {
             AND d.content IS NOT NULL
         `).bind(...ids).all();
 
-        // FTS rank 순서로 재정렬
         const rankMap = Object.fromEntries(ftsRows.map(r => [r.doc_id, r.rank]));
         docs = results.sort((a, b) => (rankMap[a.id] || 0) - (rankMap[b.id] || 0));
       }
@@ -145,22 +157,19 @@ export async function loadDocuments(db, taxCategory, question = '') {
     }
   }
 
-  // ── 1.5순위: 해석례 폴더 직접 포함 (해당 세목 해석례 항상 추가) ──
+  // ── 1.5순위: 해석례 폴더 직접 포함 (항상 추가) ──────────────
   try {
-    const interpFolderIds = INTERP_FOLDER_MAP[taxCategory] || [];
-    if (interpFolderIds.length > 0) {
-      const interpPlaceholders = interpFolderIds.map(() => '?').join(',');
+    const interpIds = INTERP_FOLDER_MAP[taxCategory] || [];
+    if (interpIds.length > 0) {
+      const ph = interpIds.map(() => '?').join(',');
       const { results: interpDocs } = await db.prepare(`
         SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
         FROM documents d
         JOIN folders f ON d.folder_id = f.id
-        WHERE d.folder_id IN (${interpPlaceholders})
-          AND d.is_active = 1
-          AND f.is_active = 1
-          AND d.content IS NOT NULL
-        ORDER BY d.updated_at DESC
-        LIMIT 4
-      `).bind(...interpFolderIds).all();
+        WHERE d.folder_id IN (${ph})
+          AND d.is_active = 1 AND f.is_active = 1 AND d.content IS NOT NULL
+        ORDER BY d.updated_at DESC LIMIT 4
+      `).bind(...interpIds).all();
 
       const existing = new Set(docs.map(d => d.id));
       for (const r of interpDocs) {
@@ -171,7 +180,30 @@ export async function loadDocuments(db, taxCategory, question = '') {
     console.error('Interp folder search failed:', e?.message);
   }
 
-  // ── 2순위: 세목 기반 폴백 (FTS 결과 없을 때) ─────────────────
+  // ── 1.7순위: 판례 폴더 직접 포함 (항상 추가) ────────────────
+  try {
+    const precIds = PREC_FOLDER_MAP[taxCategory] || [];
+    if (precIds.length > 0) {
+      const ph = precIds.map(() => '?').join(',');
+      const { results: precDocs } = await db.prepare(`
+        SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name
+        FROM documents d
+        JOIN folders f ON d.folder_id = f.id
+        WHERE d.folder_id IN (${ph})
+          AND d.is_active = 1 AND f.is_active = 1 AND d.content IS NOT NULL
+        ORDER BY d.updated_at DESC LIMIT 2
+      `).bind(...precIds).all();
+
+      const existing = new Set(docs.map(d => d.id));
+      for (const r of precDocs) {
+        if (!existing.has(r.id)) docs.push(r);
+      }
+    }
+  } catch (e) {
+    console.error('Prec folder search failed:', e?.message);
+  }
+
+  // ── 2순위: 세목 기반 폴백 (FTS 결과 부족할 때) ───────────────
   if (docs.length < 3) {
     const related = CATEGORY_MAP[taxCategory] || ['국세기본'];
     const folderLike = related.map(() => 'f.name LIKE ?').join(' OR ');
@@ -192,7 +224,6 @@ export async function loadDocuments(db, taxCategory, question = '') {
       LIMIT 8
     `).bind(...binds).all();
 
-    // 기존 FTS 결과와 중복 제거 후 병합
     const existing = new Set(docs.map(d => d.id));
     for (const r of results) {
       if (!existing.has(r.id)) docs.push(r);
@@ -200,13 +231,13 @@ export async function loadDocuments(db, taxCategory, question = '') {
   }
 
   // ── 관련 단락만 추출해서 컨텍스트 압축 ──────────────────────
-  const MAX_TOTAL = 20000; // 총 컨텍스트 한도 (약 5,000 토큰)
-  const PER_DOC   = 1800;  // 문서당 최대 추출 글자
+  const MAX_TOTAL = 24000; // 판례·해석례 포함으로 한도 상향
+  const PER_DOC   = 2400;  // 문서당 최대 (판례 케이스 3-4건 수용)
 
   const selected = [];
   let total = 0;
 
-  for (const doc of docs.slice(0, 8)) {
+  for (const doc of docs.slice(0, 10)) {
     if (total >= MAX_TOTAL) break;
     const section = keywords.length
       ? extractRelevantSections(doc.content, keywords, PER_DOC)
