@@ -33,6 +33,7 @@ const INTERP_FOLDERS = {
   "재산세": { id: 23, tax: "재산세" },
   "조사":   { id: 24, tax: "조사" },
   "개인세": { id: 25, tax: "개인세" },
+  "기타":   { id: 26, tax: "all" },
 };
 
 async function d1Query(sql, params = []) {
