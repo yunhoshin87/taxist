@@ -19,36 +19,43 @@ const DELAY_MS = 400;
 const PREC_DIR      = path.join(BASE_DIR, "판례자료");
 const MANIFEST_FILE = path.join(BASE_DIR, "law_manifest.json");
 
-// ── 세목별 판례 검색 키워드 ───────────────────────────────────
-// 검색 결과가 많을수록 좋은 키워드를 우선으로, 광범위한 것부터 좁은 것 순서
+// ── 세목별 판례·결정례 검색 키워드 ─────────────────────────
+// 대법원 판결 + 조세심판원·감사원·이의신청·과세적부심사 결정례 모두 수집
 const PREC_QUERIES = {
   "법인세": [
     "법인세", "이월결손금", "부당행위계산부인",
     "법인세법", "사업소득 법인",
+    "법인세 심판청구", "법인세 이의신청", "법인세 과세적부",
   ],
   "부가세": [
     "부가가치세", "세금계산서", "매입세액공제",
     "영세율", "면세",
+    "부가가치세 심판청구", "부가가치세 이의신청",
   ],
   "소득세": [
     "양도소득세", "종합소득세", "근로소득",
     "소득세법", "기타소득",
+    "양도소득세 심판청구", "소득세 이의신청",
   ],
   "징세": [
     "체납처분", "압류", "국세징수",
     "공매", "가산세",
+    "체납 심판청구", "국세징수 이의신청", "체납처분 과세적부",
   ],
   "재산세": [
     "재산세", "취득세", "종합부동산세",
     "지방세", "등록면허세",
+    "재산세 심판청구", "취득세 이의신청",
   ],
   "조사": [
     "세무조사", "과세처분", "경정청구",
     "조세불복", "심판청구",
+    "과세적부심사", "세무조사 이의신청", "심사청구",
   ],
   "개인세": [
     "상속세", "증여세", "양도소득세",
     "종합소득세", "소득세",
+    "상속세 심판청구", "증여세 이의신청", "상속세 과세적부",
   ],
 };
 
@@ -233,22 +240,23 @@ async function main() {
     }
     log(`  → 검색결과 ${itemMap.size}건, 상세 조회 시작...`);
 
-    // 2단계: 대법원 판례는 상세 조회, 나머지는 검색결과 기본정보 사용
+    // 2단계: 모든 판례·결정례 상세 조회 시도 (대법원·조세심판원·감사원·이의신청·과세적부 포함)
     const all = [];
     let detailOk = 0, detailFail = 0;
     for (const [pid, basic] of itemMap) {
-      const isDaebub = str(basic["데이터출처명"]).includes("대법원") ||
-                       str(basic["법원명"]).includes("대법원");
-      if (isDaebub) {
-        const detail = await fetchPrecDetail(pid);
-        if (detail) { all.push(detail); detailOk++; }
-        else        { all.push(basic);  detailFail++; }
+      const detail = await fetchPrecDetail(pid);
+      if (detail) {
+        all.push(detail);
+        detailOk++;
       } else {
+        // 상세 조회 실패 시 기본 정보 사용 (조세심판원 결정 등)
         all.push(basic);
+        detailFail++;
       }
       if (all.length % 20 === 0) log(`    ${all.length}/${itemMap.size}건 처리중...`);
     }
-    log(`  → 상세조회 성공 ${detailOk}건, 기본정보만 ${detailFail + (itemMap.size - detailOk - detailFail)}건`);
+    const sources = [...new Set(all.map(p => str(p["데이터출처명"] || p["법원명"] || "기타")))];
+    log(`  → 상세조회 성공 ${detailOk}건, 기본정보 ${detailFail}건 | 출처: ${sources.join(", ")}`);
 
     log(`  → ${category} 상세 ${all.length}건 완료`);
     if (!all.length) { log(`  ⚠️  수집 건수 0 — 스킵`); continue; }

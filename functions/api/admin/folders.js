@@ -7,9 +7,10 @@ export async function onRequest(context) {
   if (err) return err;
 
   const method = request.method;
-  if (method === "GET")  return handleGet(context);
-  if (method === "PUT")  return handlePut(context);
-  if (method === "POST") return handlePost(context);
+  if (method === "GET")   return handleGet(context);
+  if (method === "PUT")   return handlePut(context);
+  if (method === "POST")  return handlePost(context);
+  if (method === "PATCH") return handlePatch(context);
   return json({ error: "허용되지 않는 메서드" }, 405);
 }
 
@@ -67,9 +68,8 @@ async function handlePut({ request, env }) {
   return json({ ok: true });
 }
 
-// POST /api/admin/folders/document - 문서 활성/비활성 토글
+// POST /api/admin/folders - 문서 활성/비활성 토글
 async function handlePost({ request, env }) {
-  const url = new URL(request.url);
   const { doc_id, is_active } = await request.json();
   if (!doc_id) return json({ error: "doc_id 필요" }, 400);
 
@@ -77,4 +77,34 @@ async function handlePost({ request, env }) {
     .bind(is_active ? 1 : 0, doc_id).run();
 
   return json({ ok: true });
+}
+
+// PATCH /api/admin/folders - 새 문서 업로드 (엑셀/텍스트 → D1 저장)
+async function handlePatch({ request, env }) {
+  const { folder_id, name, content, tax_category } = await request.json();
+  if (!folder_id || !name || !content) return json({ error: "folder_id, name, content 필요" }, 400);
+
+  const result = await env.DB.prepare(
+    `INSERT INTO documents (folder_id, name, content, tax_category, is_active, updated_at)
+     VALUES (?, ?, ?, ?, 1, datetime('now'))`
+  ).bind(folder_id, name, content.slice(0, 500000), tax_category || 'all').run();
+
+  const docId = result.meta.last_row_id;
+
+  // FTS5 인덱스 등록 (실패해도 문서 저장은 유지)
+  try {
+    await env.DB.prepare(
+      `INSERT INTO documents_fts(rowid, name, content) VALUES (?, ?, ?)`
+    ).bind(docId, name, content.slice(0, 500000)).run();
+  } catch {
+    try {
+      await env.DB.prepare(
+        `INSERT INTO documents_fts(rowid, content) VALUES (?, ?)`
+      ).bind(docId, (name + ' ' + content).slice(0, 500000)).run();
+    } catch (e2) {
+      console.error('FTS5 insert failed:', e2?.message);
+    }
+  }
+
+  return json({ ok: true, id: docId });
 }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>자료 폴더 관리 — TAXIST 관리자</title>
   <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{--coral:#E05B4B;--navy:#1B2B4B;--navy-mid:#2E4370;
           --bg:#F0F2F5;--bg-card:#FFFFFF;--text:#222831;--text-muted:#6B7280;
@@ -229,8 +230,8 @@
       <div class="card">
         <div class="card-title">
           <span id="panelTitle">폴더를 선택하세요</span>
-          <button class="btn-sm btn-navy" onclick="document.getElementById('fileInput').click()">📤 MD 업로드</button>
-          <input type="file" id="fileInput" accept=".md" onchange="handleUpload(event)" />
+          <button class="btn-sm btn-navy" onclick="document.getElementById('fileInput').click()">📤 파일 업로드</button>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.txt" onchange="handleUpload(event)" />
         </div>
         <div class="breadcrumb" id="breadcrumb"></div>
 
@@ -249,14 +250,54 @@
                ondragleave="this.classList.remove('drag')"
                ondrop="handleDrop(event)"
                onclick="document.getElementById('fileInput').click()">
-            <div style="font-size:2.5rem">📄</div>
-            <p>MD 파일을 여기에 드래그하거나 클릭하여 업로드</p>
-            <small>Markdown (.md) 파일만 지원 · 최대 10MB</small>
+            <div style="font-size:2.5rem">📊</div>
+            <p>엑셀 또는 텍스트 파일을 드래그하거나 클릭하여 업로드</p>
+            <small>Excel (.xlsx, .xls) · 텍스트 (.txt) · 최대 10MB</small>
           </div>
         </div>
 
         <div id="fileList"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 업로드 확인 모달 ── -->
+<div class="modal-overlay" id="uploadModal" onclick="closeUploadModal(event)">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <span class="modal-title">파일 업로드 확인</span>
+      <button class="modal-close" onclick="document.getElementById('uploadModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:.82rem;font-weight:600;color:var(--navy);display:block;margin-bottom:6px">문서명</label>
+        <input id="uploadName" type="text"
+               style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                      font-family:inherit;font-size:.88rem;outline:none;transition:border .2s"
+               onfocus="this.style.borderColor='var(--coral)'" onblur="this.style.borderColor='var(--border)'" />
+      </div>
+      <div>
+        <label style="font-size:.82rem;font-weight:600;color:var(--navy);display:block;margin-bottom:6px">세목</label>
+        <select id="uploadCategory"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+                       font-family:inherit;font-size:.88rem;background:#fff;outline:none;cursor:pointer">
+          <option value="all">전체 (all)</option>
+          <option value="법인세">법인세</option>
+          <option value="부가세">부가세</option>
+          <option value="개인세">개인세 (소득세)</option>
+          <option value="재산세">재산세</option>
+          <option value="징세">징세</option>
+          <option value="조사">조사</option>
+        </select>
+      </div>
+      <div id="uploadPreview"
+           style="font-size:.76rem;color:var(--text-muted);background:var(--bg);padding:10px 12px;
+                  border-radius:var(--radius-sm);line-height:1.7;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-outline" onclick="document.getElementById('uploadModal').classList.remove('open')">취소</button>
+      <button class="btn-sm btn-coral" id="uploadSubmitBtn" onclick="submitUpload()">업로드</button>
     </div>
   </div>
 </div>
@@ -506,18 +547,117 @@ function renderMd(md) {
 }
 
 // ── 업로드 ──
+let pendingUpload = null;
+
 function handleUpload(e) {
   const file = e.target.files[0];
-  if (!file) return;
-  if (!file.name.endsWith('.md')) { alert('.md 파일만 업로드 가능합니다.'); return; }
-  if (!selectedFolderId) { alert('먼저 폴더를 선택해주세요.'); return; }
-  alert(`"${file.name}" 업로드 기능은 준비 중입니다.`);
   e.target.value = '';
+  if (file) processFile(file);
 }
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('uploadZone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+
+async function processFile(file) {
+  if (!selectedFolderId) { alert('먼저 폴더를 선택해주세요.'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('파일 크기는 10MB 이하여야 합니다.'); return; }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx', 'xls', 'txt'].includes(ext)) {
+    alert('.xlsx, .xls, .txt 파일만 업로드 가능합니다.');
+    return;
+  }
+
+  try {
+    let content = '';
+    if (ext === 'txt') {
+      content = await readAsText(file);
+    } else {
+      const buf = await readAsArrayBuffer(file);
+      const wb = XLSX.read(buf, { type: 'array' });
+      content = xlsxToText(wb);
+    }
+
+    if (!content.trim()) { alert('파일에서 텍스트를 추출할 수 없습니다.'); return; }
+
+    pendingUpload = { name: file.name, content };
+    document.getElementById('uploadName').value = file.name;
+    document.getElementById('uploadCategory').value = 'all';
+    document.getElementById('uploadPreview').textContent =
+      `추출 텍스트: ${content.length.toLocaleString()}자\n\n미리보기:\n${content.slice(0, 300)}${content.length > 300 ? '…' : ''}`;
+    document.getElementById('uploadModal').classList.add('open');
+  } catch (err) {
+    alert('파일 읽기 실패: ' + err.message);
+  }
+}
+
+function readAsText(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsText(file, 'UTF-8');
+  });
+}
+
+function readAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(new Uint8Array(e.target.result));
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function xlsxToText(wb) {
+  const lines = [];
+  wb.SheetNames.forEach(sheetName => {
+    lines.push(`[${sheetName}]`);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+    rows.forEach(row => {
+      const line = row.map(c => String(c ?? '')).join(' ').trim();
+      if (line) lines.push(line);
+    });
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+
+function closeUploadModal(e) {
+  if (e && e.target !== document.getElementById('uploadModal')) return;
+  document.getElementById('uploadModal').classList.remove('open');
+  pendingUpload = null;
+}
+
+async function submitUpload() {
+  if (!pendingUpload) return;
+  const name = document.getElementById('uploadName').value.trim();
+  const tax_category = document.getElementById('uploadCategory').value;
+  if (!name) { alert('문서명을 입력해주세요.'); return; }
+
+  const btn = document.getElementById('uploadSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '업로드 중...';
+
+  try {
+    await api('/api/admin/folders', {
+      method: 'PATCH',
+      body: JSON.stringify({ folder_id: selectedFolderId, name, content: pendingUpload.content, tax_category })
+    });
+    document.getElementById('uploadModal').classList.remove('open');
+    pendingUpload = null;
+    await loadFolders();
+    renderFileList(selectedFolderId);
+  } catch (err) {
+    alert('업로드 실패: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '업로드';
+  }
 }
 
 loadFolders();

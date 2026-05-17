@@ -192,10 +192,11 @@
     .rpt-section{margin-bottom:26px}
     .rpt-section:last-of-type{margin-bottom:0}
     .rpt-h{display:flex;align-items:center;gap:8px;margin-bottom:12px;
-           padding-bottom:8px;border-bottom:2px solid var(--border)}
-    .rpt-h-num{font-size:.7rem;font-weight:800;color:#fff;background:var(--navy);
-               padding:2px 8px;border-radius:4px;flex-shrink:0;letter-spacing:.05em}
-    .rpt-h-text{font-size:.9rem;font-weight:800;color:var(--navy)}
+           padding-bottom:8px;border-bottom:2px solid var(--navy)}
+    .rpt-h-text{font-size:.95rem;font-weight:800;color:var(--navy)}
+    .rpt-h3{margin:18px 0 10px;padding:8px 12px;background:#EEF2FF;
+            border-left:4px solid var(--navy-mid);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+    .rpt-h3-text{font-size:.86rem;font-weight:800;color:var(--navy-mid)}
     .rpt-body p{margin:0 0 9px}
     .rpt-body p:last-child{margin:0}
     .rpt-subh{font-size:.81rem;font-weight:800;color:var(--navy-mid);
@@ -220,10 +221,7 @@
     .rpt-table tr:hover td{background:#F9FAFB}
     .rpt-table td:first-child{font-weight:600;color:var(--navy-mid);white-space:nowrap}
 
-    /* 출처·경고 */
-    .source-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-    .source-chip{font-size:.72rem;padding:3px 10px;border-radius:100px;
-                 background:#EEF4FF;color:#3B5BDB;font-weight:600}
+    /* 경고 */
     .warning-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius-sm);
                  padding:11px 14px;font-size:.78rem;color:#92400E;line-height:1.6}
 
@@ -786,37 +784,36 @@ async function submitQuestion() {
 }
 
 // ── 보고서 렌더러 ──
-const SECTION_NUMS = { 'Ⅰ':'Ⅰ','Ⅱ':'Ⅱ','Ⅲ':'Ⅲ','Ⅳ':'Ⅳ','Ⅴ':'Ⅴ','Ⅵ':'Ⅵ','Ⅶ':'Ⅶ','Ⅷ':'Ⅷ' };
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function inlineFmt(s) {
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`(.+?)`/g,'<code style="background:#F3F4F6;padding:1px 4px;border-radius:3px;font-size:.82em">$1</code>');
+}
 
 function renderReport(md) {
   const lines = md.split('\n');
   let html = '';
   let i = 0;
 
-  function esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-  function inlineFmt(s) {
-    return esc(s)
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/`(.+?)`/g,'<code style="background:#F3F4F6;padding:1px 4px;border-radius:3px;font-size:.82em">$1</code>');
-  }
-
   while (i < lines.length) {
     const line = lines[i];
 
-    // 섹션 헤더: ## Ⅰ. 제목
-    const secMatch = line.match(/^##\s+([ⅠⅡⅢⅣⅤⅥⅦⅧ])\.\s+(.+)$/);
-    if (secMatch) {
+    // 메인 섹션 헤더: ## 제목 (### 아닌 것)
+    if (line.match(/^##\s+/) && !line.match(/^###/)) {
+      const title = line.replace(/^##\s+/, '').trim();
       html += `<div class="rpt-section"><div class="rpt-h">
-        <span class="rpt-h-num">${secMatch[1]}</span>
-        <span class="rpt-h-text">${esc(secMatch[2])}</span>
+        <span class="rpt-h-text">${esc(title)}</span>
       </div><div class="rpt-body">`;
       i++;
-      // 섹션 끝까지 내용 수집
       let body = '';
-      while (i < lines.length && !lines[i].match(/^##\s+[ⅠⅡⅢⅣⅤⅥⅦⅧ]\./)) {
-        body += lines[i] + '\n';
+      while (i < lines.length) {
+        const cur = lines[i];
+        // 다음 ## 섹션 만나면 중단 (### 는 포함)
+        if (cur.match(/^##\s+/) && !cur.match(/^###/)) break;
+        body += cur + '\n';
         i++;
       }
       html += renderSectionBody(body);
@@ -839,7 +836,6 @@ function renderSectionBody(text) {
   const lines = text.split('\n');
   let i = 0;
   let tableRows = [];
-  let tableHeader = false;
   let listItems = [];
 
   function flushTable() {
@@ -862,16 +858,18 @@ function renderSectionBody(text) {
     html += '<ul class="rpt-list">' + listItems.map(li=>`<li>${inlineFmt(li)}</li>`).join('') + '</ul>';
     listItems = [];
   }
-  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function inlineFmt(s){
-    return esc(s)
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/`(.+?)`/g,'<code style="background:#F3F4F6;padding:1px 4px;border-radius:3px;font-size:.82em">$1</code>');
-  }
 
   while (i < lines.length) {
     const line = lines[i];
     const trimmed = line.trim();
+
+    // 서브섹션 헤더: ### 가. 나. 다.
+    const h3Match = trimmed.match(/^###\s+(.+)$/);
+    if (h3Match) {
+      flushTable(); flushList();
+      html += `<div class="rpt-h3"><span class="rpt-h3-text">${esc(h3Match[1])}</span></div>`;
+      i++; continue;
+    }
 
     // 소제목 **[항목]**
     const subhMatch = trimmed.match(/^\*\*\[(.+?)\]\*\*$/);
@@ -946,13 +944,8 @@ function showAnswer(tax, mdContent, sources) {
 
   document.getElementById('ansBody').innerHTML =
     renderReport(body) +
-    (sources.length ? `
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-        <div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;color:var(--coral);margin-bottom:8px">근거 자료</div>
-        <div class="source-row">${sources.map(s=>`<span class="source-chip">📄 ${s}</span>`).join('')}</div>
-      </div>` : '') +
     (note ? `<div class="warning-box" style="margin-top:14px">⚠️ ${note}</div>` :
-      `<div class="warning-box" style="margin-top:14px">⚠️ 본 검토 보고서는 AI가 생성한 참고용 의견입니다. 최종 법적 판단의 책임은 담당자에게 있습니다.</div>`);
+      `<div class="warning-box" style="margin-top:14px">⚠️ 본 회신은 AI가 생성한 참고용 의견입니다. 최종 법적 판단의 책임은 담당자에게 있습니다.</div>`);
 
   document.getElementById('answerCard').style.display = 'block';
 }
