@@ -35,7 +35,12 @@ async function handleList({ request, env }) {
     "SELECT COUNT(*) AS cnt FROM questions WHERE user_id = ?"
   ).bind(user.id).all();
 
-  return json({ questions: results, total: cnt, page, limit });
+  const TRIAL_LIMIT = 5;
+  const trialRemaining = user.status === "trial"
+    ? Math.max(0, TRIAL_LIMIT - Number(cnt))
+    : null;
+
+  return json({ questions: results, total: cnt, page, limit, trial_remaining: trialRemaining, trial_limit: TRIAL_LIMIT });
 }
 
 // POST /api/questions - 질문 등록 + AI 답변 생성
@@ -44,9 +49,25 @@ async function handleCreate({ request, env }) {
   const err  = requireAuth(user);
   if (err) return err;
 
-  // 무료 기간 만료 체크
+  // 만료 체크
   if (user.status === "expired") {
-    return json({ error: "무료 이용 기간이 만료되었습니다. 서비스 문의를 통해 연장을 신청해주세요." }, 403);
+    return json({ error: "무료 이용 기간이 만료되었습니다. 이용권을 구매하면 계속 사용할 수 있습니다.", code: "EXPIRED" }, 403);
+  }
+
+  // 무료 체험 5건 한도 체크
+  const TRIAL_LIMIT = 5;
+  if (user.status === "trial") {
+    const { results: [{ cnt }] } = await env.DB.prepare(
+      "SELECT COUNT(*) AS cnt FROM questions WHERE user_id = ?"
+    ).bind(user.id).all();
+    if (cnt >= TRIAL_LIMIT) {
+      return json({
+        error: `무료 체험 중에는 최대 ${TRIAL_LIMIT}건의 질문만 가능합니다. 이용권을 구매하면 제한 없이 사용할 수 있습니다.`,
+        code: "TRIAL_LIMIT",
+        used: cnt,
+        limit: TRIAL_LIMIT,
+      }, 403);
+    }
   }
 
   const { tax_category, title, content } = await request.json();

@@ -3,184 +3,288 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>회원가입 — TAXIST | 세무행정 AI 질의응답</title>
+  <title>회원가입 — TAXIST</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --coral: #E05B4B; --coral-dark: #C24636; --coral-light: #FFF0EE;
-      --navy: #1B2B4B; --navy-mid: #2E4370;
-      --bg: #F7F5F2; --bg-card: #FFFFFF;
-      --text: #222831; --text-muted: #6B7280;
-      --border: #E5E7EB;
-      --radius-sm: 8px; --radius-md: 16px;
+      --brand:       #1B2B4B;
+      --brand-dark:  #0F1E35;
+      --brand-mid:   #2E4370;
+      --blue:        #1563FF;
+      --blue-dark:   #0F45B4;
+      --blue-light:  #E8F0FF;
+      --neutral-0:   #FFFFFF;
+      --neutral-50:  #FAFAFA;
+      --neutral-100: #F5F5F5;
+      --neutral-200: #E8E8E8;
+      --neutral-300: #CCCCCC;
+      --neutral-400: #999999;
+      --neutral-600: #555555;
+      --neutral-700: #3B3B3B;
+      --neutral-900: #1A1A1A;
+      --success:     #0D7F3F;
+      --success-light:#E6F6EE;
+      --error:       #C82B2B;
+      --error-light: #FEF2F2;
+      --error-border:#FECACA;
+      --font: 'Inter', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --radius:    5px;
+      --radius-md: 8px;
     }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
-           background: var(--bg); color: var(--text); min-height: 100vh; }
+    body {
+      font-family: var(--font);
+      background: var(--neutral-100);
+      color: var(--neutral-900);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
     a { text-decoration: none; color: inherit; }
 
-    /* header */
+    /* ── HEADER ── */
     header {
-      background: #fff; border-bottom: 1px solid var(--border);
-      padding: 0 24px; height: 60px; display: flex; align-items: center;
-      justify-content: space-between;
+      background: var(--neutral-0);
+      border-bottom: 1px solid var(--neutral-200);
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
     }
-    .logo { font-size: 1.4rem; font-weight: 800; color: var(--navy); letter-spacing: -.04em; }
-    .logo span { color: var(--coral); }
-    header a.login-link { font-size: .88rem; color: var(--text-muted); font-weight: 600; }
-    header a.login-link:hover { color: var(--navy); }
+    .logo { font-size: 1.15rem; font-weight: 800; color: var(--brand); letter-spacing: -.04em; }
+    .logo-dot { color: var(--blue); }
+    .header-link { font-size: .82rem; color: var(--neutral-400); }
+    .header-link a { color: var(--blue); font-weight: 600; }
+    .header-link a:hover { color: var(--blue-dark); }
 
-    /* progress */
-    .progress-bar {
-      background: #fff; border-bottom: 1px solid var(--border);
-      padding: 20px 24px;
+    /* ── PROGRESS ── */
+    .progress-wrap {
+      background: var(--neutral-0);
+      border-bottom: 1px solid var(--neutral-200);
+      padding: 16px 32px;
     }
-    .progress-inner { max-width: 600px; margin: 0 auto; }
-    .steps-nav { display: flex; align-items: center; justify-content: center; gap: 0; }
-    .step-nav { display: flex; align-items: center; gap: 8px; }
-    .step-nav-num {
-      width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: .82rem; font-weight: 700;
-      background: var(--border); color: var(--text-muted); transition: all .3s;
+    .progress-inner { max-width: 560px; margin: 0 auto; }
+    .step-track {
+      display: flex; align-items: center; gap: 0;
+      position: relative;
     }
-    .step-nav-num.active { background: var(--coral); color: #fff; }
-    .step-nav-num.done { background: var(--navy); color: #fff; }
-    .step-nav-label { font-size: .8rem; font-weight: 600; color: var(--text-muted); }
-    .step-nav.active .step-nav-label { color: var(--navy); }
-    .step-line { width: 40px; height: 2px; background: var(--border); margin: 0 8px; }
-    .step-line.done { background: var(--navy); }
+    .step-node { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .step-node:last-child { flex: 0; }
+    .step-circle {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700; flex-shrink: 0;
+      border: 2px solid var(--neutral-300);
+      background: var(--neutral-0);
+      color: var(--neutral-400);
+      transition: all .2s;
+    }
+    .step-circle.active { border-color: var(--brand); background: var(--brand); color: #fff; }
+    .step-circle.done   { border-color: var(--success); background: var(--success); color: #fff; }
+    .step-label { font-size: .78rem; font-weight: 600; color: var(--neutral-400); }
+    .step-node.active .step-label { color: var(--neutral-900); }
+    .step-line { flex: 1; height: 1px; background: var(--neutral-200); margin: 0 8px; transition: background .2s; }
+    .step-line.done { background: var(--success); }
 
-    /* form container */
-    .form-container { max-width: 600px; margin: 40px auto; padding: 0 24px 60px; }
-    .form-card {
-      background: #fff; border: 1px solid var(--border);
-      border-radius: var(--radius-md); padding: 40px;
+    /* ── LAYOUT ── */
+    .page { max-width: 560px; margin: 40px auto; padding: 0 24px 80px; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--neutral-0);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-md);
+      padding: 40px 40px;
     }
+
+    /* ── STEP ── */
     .form-step { display: none; }
     .form-step.active { display: block; }
-    .step-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -.02em; }
-    .step-desc { font-size: .88rem; color: var(--text-muted); margin-bottom: 28px; line-height: 1.6; }
+    .step-title {
+      font-size: 1.25rem; font-weight: 800;
+      color: var(--neutral-900); letter-spacing: -.03em; margin-bottom: 6px;
+    }
+    .step-desc {
+      font-size: .84rem; color: var(--neutral-400);
+      margin-bottom: 28px; line-height: 1.6;
+    }
 
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .form-group { margin-bottom: 18px; }
-    .form-group label { display: block; font-size: .82rem; font-weight: 600;
-                        color: var(--navy); margin-bottom: 7px; }
-    .required { color: var(--coral); margin-left: 3px; }
+    /* ── FORM ── */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: .78rem; font-weight: 600;
+      color: var(--neutral-700); margin-bottom: 6px;
+    }
+    .required { color: var(--blue); margin-left: 2px; }
     .form-group input, .form-group select {
-      width: 100%; padding: 13px 16px; border: 1.5px solid var(--border);
-      border-radius: var(--radius-sm); font-size: .92rem; font-family: inherit;
-      background: var(--bg); color: var(--text); transition: border-color .2s, box-shadow .2s;
-      appearance: none;
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--neutral-300);
+      border-radius: var(--radius); font-size: .9rem;
+      font-family: var(--font); color: var(--neutral-900);
+      background: var(--neutral-0);
+      transition: border-color .15s, box-shadow .15s;
+      outline: none; appearance: none;
     }
+    .form-group input:hover, .form-group select:hover { border-color: var(--neutral-400); }
     .form-group input:focus, .form-group select:focus {
-      outline: none; border-color: var(--coral);
-      box-shadow: 0 0 0 3px rgba(224,91,75,.12); background: #fff;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(21,99,255,.12);
     }
-    .hint { font-size: .76rem; color: var(--text-muted); margin-top: 5px; }
+    .form-group input::placeholder { color: var(--neutral-300); }
+    .hint { font-size: .74rem; color: var(--neutral-400); margin-top: 5px; line-height: 1.5; }
 
-    /* tax categories */
-    .tax-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    /* ── TAX CATEGORIES ── */
+    .tax-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
     .tax-item { position: relative; }
     .tax-item input[type=checkbox] { position: absolute; opacity: 0; pointer-events: none; }
     .tax-item label {
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
-      padding: 16px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-      cursor: pointer; text-align: center; transition: all .2s;
-      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 16px 10px 14px;
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-md);
+      cursor: pointer; text-align: center;
+      transition: all .15s;
+      background: var(--neutral-50);
     }
+    .tax-item label:hover { border-color: var(--blue); background: var(--blue-light); }
     .tax-item input:checked + label {
-      border-color: var(--coral); background: var(--coral-light);
+      border-color: var(--brand); background: #EEF2FF;
+      box-shadow: 0 0 0 2px rgba(27,43,75,.1);
     }
-    .tax-item label:hover { border-color: var(--coral); }
-    .tax-emoji { font-size: 1.5rem; }
-    .tax-name { font-size: .82rem; font-weight: 700; color: var(--navy); }
-    .tax-en { font-size: .7rem; color: var(--text-muted); }
+    .tax-emoji { font-size: 1.4rem; }
+    .tax-name { font-size: .8rem; font-weight: 700; color: var(--neutral-900); }
+    .tax-en   { font-size: .68rem; color: var(--neutral-400); }
 
-    /* terms */
-    .terms-box {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 14px 16px; max-height: 140px;
-      overflow-y: auto; font-size: .78rem; color: var(--text-muted); line-height: 1.7;
-      margin-bottom: 12px;
+    /* ── TERMS ── */
+    .terms-scroll {
+      background: var(--neutral-50); border: 1px solid var(--neutral-200);
+      border-radius: var(--radius); padding: 14px 16px;
+      max-height: 120px; overflow-y: auto;
+      font-size: .76rem; color: var(--neutral-400); line-height: 1.7;
+      margin-bottom: 14px;
     }
-    .check-item { display: flex; align-items: center; gap: 10px;
-                  padding: 10px 0; border-bottom: 1px solid var(--border); }
-    .check-item:last-child { border-bottom: none; }
-    .check-item input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--coral); cursor: pointer; }
-    .check-item label { font-size: .88rem; cursor: pointer; }
-    .check-item .required { font-weight: 700; font-size: .76rem; }
-    .check-all { font-weight: 700; font-size: .9rem; }
-
-    /* trial info */
-    .trial-info {
-      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
-      border-radius: var(--radius-sm); padding: 20px 24px; margin-bottom: 24px;
+    .check-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--neutral-200);
     }
-    .trial-info h4 { color: #fff; font-size: .95rem; margin-bottom: 8px; }
-    .trial-info p { color: rgba(255,255,255,.65); font-size: .82rem; line-height: 1.6; }
-    .trial-highlight { color: var(--coral); font-weight: 700; }
+    .check-row:last-child { border-bottom: none; }
+    .check-row input[type=checkbox] {
+      width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; flex-shrink: 0;
+    }
+    .check-row label { font-size: .85rem; cursor: pointer; }
+    .check-row .req-badge {
+      font-size: .68rem; font-weight: 700; color: var(--blue);
+      background: var(--blue-light); padding: 2px 7px; border-radius: 100px;
+    }
+    .check-all-label { font-weight: 700; font-size: .9rem; }
 
-    /* nav buttons */
-    .form-actions { display: flex; gap: 12px; margin-top: 32px; }
+    /* ── TRIAL BOX ── */
+    .trial-box {
+      background: var(--brand); border-radius: var(--radius-md);
+      padding: 18px 22px; margin-bottom: 24px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .trial-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .trial-title { font-size: .9rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .trial-highlight { color: #93C5FD; }
+    .trial-desc { font-size: .8rem; color: rgba(255,255,255,.6); line-height: 1.6; }
+
+    /* ── BUTTONS ── */
+    .form-actions { display: flex; gap: 10px; margin-top: 28px; }
     .btn-prev {
-      padding: 13px 24px; border-radius: var(--radius-sm);
-      border: 1.5px solid var(--border); background: transparent;
-      font-size: .92rem; font-weight: 600; color: var(--text-muted);
-      font-family: inherit; cursor: pointer; transition: all .2s;
+      padding: 10px 20px; border-radius: var(--radius);
+      border: 1px solid var(--neutral-300);
+      background: transparent; font-size: .875rem; font-weight: 600;
+      color: var(--neutral-600); font-family: var(--font); cursor: pointer;
+      transition: all .15s;
     }
-    .btn-prev:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-prev:hover { border-color: var(--neutral-700); color: var(--neutral-900); }
     .btn-next {
-      flex: 1; padding: 13px; border-radius: var(--radius-sm);
-      background: var(--coral); color: #fff; font-size: .95rem; font-weight: 700;
-      font-family: inherit; cursor: pointer; border: none;
-      box-shadow: 0 2px 10px rgba(224,91,75,.3); transition: all .2s;
+      flex: 1; padding: 10px; border-radius: var(--radius);
+      background: var(--brand); color: #fff;
+      border: 1px solid var(--brand); font-size: .9rem; font-weight: 700;
+      font-family: var(--font); cursor: pointer;
+      transition: all .15s;
     }
-    .btn-next:hover { background: var(--coral-dark); transform: translateY(-1px); }
-    .btn-next:disabled { background: var(--border); color: var(--text-muted);
-                          box-shadow: none; transform: none; cursor: not-allowed; }
+    .btn-next:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+    .btn-next:disabled {
+      background: var(--neutral-200); border-color: var(--neutral-200);
+      color: var(--neutral-400); cursor: not-allowed;
+    }
+
+    /* ── SUCCESS ── */
+    .success-screen { text-align: center; padding: 20px 0; }
+    .success-icon {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: var(--success-light);
+      border: 2px solid var(--success);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; margin: 0 auto 24px;
+    }
+    .success-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -.03em; }
+    .success-desc { font-size: .88rem; color: var(--neutral-400); margin-bottom: 28px; line-height: 1.6; }
+    .trial-info-card {
+      background: var(--neutral-50); border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-md); padding: 20px 24px; margin-bottom: 28px;
+      text-align: left;
+    }
+    .trial-info-card h4 { font-size: .88rem; font-weight: 700; margin-bottom: 6px; }
+    .trial-info-card p { font-size: .84rem; color: var(--neutral-400); }
+    .trial-info-card .date { color: var(--brand); font-weight: 700; }
+    .btn-go {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 32px;
+      background: var(--brand); color: #fff;
+      border-radius: var(--radius-md);
+      font-size: .9rem; font-weight: 700;
+      border: none; cursor: pointer; transition: all .15s;
+    }
+    .btn-go:hover { background: var(--brand-dark); }
 
     @media (max-width: 600px) {
       .form-row { grid-template-columns: 1fr; }
-      .tax-grid { grid-template-columns: repeat(2, 1fr); }
-      .form-card { padding: 24px 20px; }
+      .tax-grid  { grid-template-columns: repeat(2, 1fr); }
+      .card { padding: 28px 22px; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <a href="index.html" class="logo">TAXIST<span style="color:var(--coral)">.</span></a>
-  <a href="login.html" class="login-link">이미 계정이 있으신가요? 로그인 →</a>
+  <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
+  <span class="header-link">이미 계정이 있으신가요? <a href="login.html">로그인 →</a></span>
 </header>
 
-<div class="progress-bar">
+<div class="progress-wrap">
   <div class="progress-inner">
-    <div class="steps-nav">
-      <div class="step-nav active" id="snav1">
-        <div class="step-nav-num active" id="snum1">1</div>
-        <div class="step-nav-label">기본 정보</div>
+    <div class="step-track">
+      <div class="step-node active" id="snav1">
+        <div class="step-circle active" id="sc1">1</div>
+        <span class="step-label">기본 정보</span>
       </div>
-      <div class="step-line" id="sline1"></div>
-      <div class="step-nav" id="snav2">
-        <div class="step-nav-num" id="snum2">2</div>
-        <div class="step-nav-label">세목 선택</div>
+      <div class="step-line" id="sl1"></div>
+      <div class="step-node" id="snav2">
+        <div class="step-circle" id="sc2">2</div>
+        <span class="step-label">세목 선택</span>
       </div>
-      <div class="step-line" id="sline2"></div>
-      <div class="step-nav" id="snav3">
-        <div class="step-nav-num" id="snum3">3</div>
-        <div class="step-nav-label">약관 동의</div>
+      <div class="step-line" id="sl2"></div>
+      <div class="step-node" id="snav3">
+        <div class="step-circle" id="sc3">3</div>
+        <span class="step-label">약관 동의</span>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-container">
-  <div class="form-card">
+<div class="page">
+  <div class="card">
 
-    <!-- STEP 1: 기본 정보 -->
+    <!-- STEP 1 -->
     <div class="form-step active" id="step1">
-      <h2 class="step-title">기본 정보를 입력해주세요</h2>
-      <p class="step-desc">세무행정 서비스 이용을 위한 기본 정보입니다.</p>
+      <h2 class="step-title">기본 정보</h2>
+      <p class="step-desc">서비스 이용을 위한 기본 정보를 입력해 주세요.</p>
 
       <div class="form-row">
         <div class="form-group">
@@ -192,16 +296,18 @@
           <input type="text" id="org" placeholder="○○세무서 법인세과" required />
         </div>
       </div>
+
       <div class="form-group">
         <label for="email">아이디 <span class="required">*</span></label>
-        <input type="text" id="email" placeholder="영문·숫자·밑줄 사용 가능 (예: hong_gildong)" required
+        <input type="text" id="email" placeholder="영문·숫자·특수문자(. _ @ -) 사용 가능" required
                oninput="this.value=this.value.replace(/[^a-zA-Z0-9_.@-]/g,'')" />
-        <p class="hint">로그인 시 사용할 아이디입니다. 영문, 숫자, 특수문자(. _ @ -)만 입력 가능합니다.</p>
+        <p class="hint">로그인 시 사용할 아이디입니다.</p>
       </div>
+
       <div class="form-row">
         <div class="form-group">
           <label for="pw">비밀번호 <span class="required">*</span></label>
-          <input type="password" id="pw" placeholder="8자 이상 입력" required />
+          <input type="password" id="pw" placeholder="8자 이상" required />
           <p class="hint">영문·숫자·특수문자 포함 8자 이상</p>
         </div>
         <div class="form-group">
@@ -209,21 +315,21 @@
           <input type="password" id="pw2" placeholder="비밀번호 재입력" required />
         </div>
       </div>
+
       <div class="form-group">
-        <label for="phone">연락처 (선택)</label>
+        <label for="phone">연락처 <span style="color:var(--neutral-400);font-weight:400">(선택)</span></label>
         <input type="tel" id="phone" placeholder="010-0000-0000" />
-        <p class="hint">향후 서비스 안내에 활용됩니다.</p>
       </div>
 
       <div class="form-actions">
-        <button class="btn-next" onclick="goStep(2)">다음 단계 →</button>
+        <button class="btn-next" onclick="goStep(2)">다음 →</button>
       </div>
     </div>
 
-    <!-- STEP 2: 세목 선택 -->
+    <!-- STEP 2 -->
     <div class="form-step" id="step2">
-      <h2 class="step-title">담당 세목을 선택해주세요</h2>
-      <p class="step-desc">1개 이상 선택하세요. 세목에 맞는 자료와 답변 범위가 설정됩니다.</p>
+      <h2 class="step-title">담당 세목 선택</h2>
+      <p class="step-desc">1개 이상 선택해 주세요. 세목에 맞는 자료와 답변 범위가 자동으로 설정됩니다.</p>
 
       <div class="tax-grid">
         <div class="tax-item">
@@ -278,75 +384,77 @@
 
       <div class="form-actions">
         <button class="btn-prev" onclick="goStep(1)">← 이전</button>
-        <button class="btn-next" id="step2Next" onclick="goStep(3)" disabled>다음 단계 →</button>
+        <button class="btn-next" id="step2Next" onclick="goStep(3)" disabled>다음 →</button>
       </div>
     </div>
 
-    <!-- STEP 3: 약관 동의 -->
+    <!-- STEP 3 -->
     <div class="form-step" id="step3">
-      <h2 class="step-title">약관에 동의해주세요</h2>
-      <p class="step-desc">서비스 이용을 위해 아래 약관을 확인하고 동의해주세요.</p>
+      <h2 class="step-title">약관 동의</h2>
+      <p class="step-desc">서비스 이용 전 아래 약관을 확인해 주세요.</p>
 
-      <div class="trial-info">
-        <h4>🎉 가입 즉시 <span class="trial-highlight">1개월 무료</span> 이용이 시작됩니다</h4>
-        <p>무료 기간 동안 모든 기능을 제한 없이 이용하실 수 있습니다.<br>
-           결제 정보 없이 가입 가능하며, 무료 기간 종료 후 서비스 안내를 드립니다.</p>
+      <div class="trial-box">
+        <span class="trial-icon">🎉</span>
+        <div>
+          <div class="trial-title">가입 즉시 <span class="trial-highlight">1개월 무료</span> 이용이 시작됩니다</div>
+          <div class="trial-desc">결제 정보 없이 가입 가능 · 무료 기간 종료 후 서비스 안내를 드립니다.</div>
+        </div>
       </div>
 
-      <div class="check-item" style="border-bottom: 2px solid var(--border); padding-bottom: 14px; margin-bottom: 4px;">
+      <div class="check-row" style="border-bottom: 2px solid var(--neutral-200); padding-bottom: 14px; margin-bottom: 4px;">
         <input type="checkbox" id="all" onchange="toggleAll(this)" />
-        <label for="all" class="check-all">전체 동의</label>
+        <label for="all" class="check-all-label">전체 동의</label>
       </div>
-      <div class="check-item">
+
+      <div class="check-row">
         <input type="checkbox" id="terms" class="term-check" onchange="checkAll()" />
-        <label for="terms">이용약관 동의 <span class="required">(필수)</span></label>
+        <label for="terms">이용약관 동의</label>
+        <span class="req-badge">필수</span>
       </div>
-      <div class="terms-box">
-        제1조 (목적) 본 약관은 TAXIST 서비스(이하 "서비스") 이용에 관한 조건 및 절차, 회사와 이용자의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.<br><br>
+      <div class="terms-scroll">
+        제1조 (목적) 본 약관은 TAXIST 서비스 이용에 관한 조건 및 절차, 회사와 이용자의 권리·의무를 규정함을 목적으로 합니다.<br><br>
         제2조 (이용 자격) 세무행정 업무를 수행하는 공무원 및 관련 종사자로서 본 약관에 동의한 자는 서비스를 이용할 수 있습니다.<br><br>
         제3조 (서비스 제공) 본 서비스는 AI 기반 질의응답 보조 도구로서, 최종 법적 판단의 책임은 이용자에게 있습니다.<br><br>
-        제4조 (무료 이용 기간) 가입일로부터 1개월간 무료로 서비스를 이용할 수 있습니다. 이후 유료 전환 시 별도 안내를 드립니다.
+        제4조 (무료 이용 기간) 가입일로부터 1개월간 무료로 서비스를 이용할 수 있습니다.
       </div>
-      <div class="check-item">
+
+      <div class="check-row">
         <input type="checkbox" id="privacy" class="term-check" onchange="checkAll()" />
-        <label for="privacy">개인정보 처리방침 동의 <span class="required">(필수)</span></label>
+        <label for="privacy">개인정보 처리방침 동의</label>
+        <span class="req-badge">필수</span>
       </div>
-      <div class="terms-box">
+      <div class="terms-scroll">
         수집 항목: 이름, 이메일, 소속기관, 담당세목, 연락처(선택), 질의응답 이력<br><br>
-        수집 목적: 서비스 제공, 회원 관리, 이용 통계 분석, 서비스 개선<br><br>
-        보유 기간: 회원 탈퇴 시까지. 단, 법령에 의해 보존이 필요한 경우 해당 기간 보유<br><br>
-        귀하는 개인정보 처리에 동의를 거부할 권리가 있으나, 거부 시 서비스 이용이 제한될 수 있습니다.
+        수집 목적: 서비스 제공, 회원 관리, 이용 통계 분석<br><br>
+        보유 기간: 회원 탈퇴 시까지. 단, 법령에 의해 보존이 필요한 경우 해당 기간 보유
       </div>
-      <div class="check-item">
+
+      <div class="check-row">
         <input type="checkbox" id="marketing" class="term-check" onchange="checkAll()" />
-        <label for="marketing">마케팅 정보 수신 동의 (선택)</label>
+        <label for="marketing">마케팅 정보 수신 동의</label>
+        <span style="font-size:.72rem;color:var(--neutral-400);margin-left:4px">(선택)</span>
       </div>
 
       <div class="form-actions">
         <button class="btn-prev" onclick="goStep(2)">← 이전</button>
         <button class="btn-next" id="step3Submit" onclick="handleSignup()" disabled>
-          가입 완료 · 무료 시작하기
+          가입 완료 · 무료 시작
         </button>
       </div>
     </div>
 
-    <!-- STEP 4: 완료 -->
-    <div class="form-step" id="step4" style="text-align:center;padding:20px 0;">
-      <div style="font-size:4rem;margin-bottom:20px;">🎉</div>
-      <h2 class="step-title" style="text-align:center;">가입이 완료되었습니다!</h2>
-      <p class="step-desc" style="text-align:center;">
-        지금부터 1개월간 모든 기능을 무료로 이용하실 수 있습니다.
-      </p>
-      <div class="trial-info" style="margin:24px 0;text-align:left;">
-        <h4>📅 무료 이용 기간</h4>
-        <p>오늘부터 <span class="trial-highlight" id="trialEnd"></span>까지</p>
+    <!-- STEP 4 -->
+    <div class="form-step" id="step4">
+      <div class="success-screen">
+        <div class="success-icon">✓</div>
+        <h2 class="success-title">가입 완료!</h2>
+        <p class="success-desc">지금부터 1개월간 모든 기능을 무료로 이용하실 수 있습니다.</p>
+        <div class="trial-info-card">
+          <h4>무료 이용 기간</h4>
+          <p>오늘부터 <span class="date" id="trialEnd"></span>까지</p>
+        </div>
+        <a href="login.html" class="btn-go">로그인하여 시작하기 →</a>
       </div>
-      <a href="login.html" style="display:inline-block;background:var(--coral);color:#fff;
-         padding:14px 36px;border-radius:var(--radius-sm);font-weight:700;font-size:.95rem;
-         transition:all .2s;" onmouseover="this.style.background='var(--coral-dark)'"
-         onmouseout="this.style.background='var(--coral)'">
-        로그인하여 시작하기 →
-      </a>
     </div>
 
   </div>
@@ -359,24 +467,31 @@ function goStep(n) {
   document.getElementById('step' + currentStep).classList.remove('active');
   document.getElementById('step' + n).classList.add('active');
 
-  // update progress nav
   for (let i = 1; i <= 3; i++) {
-    const num = document.getElementById('snum' + i);
+    const sc  = document.getElementById('sc' + i);
     const nav = document.getElementById('snav' + i);
-    num.classList.remove('active','done');
+    sc.classList.remove('active', 'done');
     nav.classList.remove('active');
-    if (i < n) { num.classList.add('done'); num.textContent = '✓'; }
-    else if (i === n) { num.classList.add('active'); num.textContent = i; nav.classList.add('active'); }
-    else { num.textContent = i; }
+
+    if (i < n) {
+      sc.classList.add('done');
+      sc.textContent = '✓';
+    } else if (i === n) {
+      sc.classList.add('active');
+      sc.textContent = i;
+      nav.classList.add('active');
+    } else {
+      sc.textContent = i;
+    }
+
     if (i < 3) {
-      const line = document.getElementById('sline' + i);
-      line.classList.toggle('done', i < n);
+      document.getElementById('sl' + i).classList.toggle('done', i < n);
     }
   }
   currentStep = n;
 }
 
-// 세목 최소 1개 선택 체크
+/* 세목 최소 1개 선택 체크 */
 document.querySelectorAll('.tax-item input[type=checkbox]').forEach(cb => {
   cb.addEventListener('change', () => {
     const any = document.querySelectorAll('.tax-item input:checked').length > 0;
@@ -384,7 +499,6 @@ document.querySelectorAll('.tax-item input[type=checkbox]').forEach(cb => {
   });
 });
 
-// 약관 전체 동의
 function toggleAll(master) {
   document.querySelectorAll('.term-check').forEach(cb => cb.checked = master.checked);
   checkSubmit();
@@ -395,50 +509,52 @@ function checkAll() {
   checkSubmit();
 }
 function checkSubmit() {
-  const required = ['terms','privacy'];
-  const ok = required.every(id => document.getElementById(id).checked);
+  const ok = ['terms', 'privacy'].every(id => document.getElementById(id).checked);
   document.getElementById('step3Submit').disabled = !ok;
 }
 
 async function handleSignup() {
-  const btn = document.getElementById('step3Submit');
-  const pw = document.getElementById('pw').value;
+  const pw  = document.getElementById('pw').value;
   const pw2 = document.getElementById('pw2').value;
   if (pw !== pw2) { alert('비밀번호가 일치하지 않습니다.'); return; }
 
+  const btn = document.getElementById('step3Submit');
   btn.textContent = '처리 중...';
   btn.disabled = true;
 
   const tax_categories = [...document.querySelectorAll('.tax-item input:checked')].map(c => c.value);
+
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: document.getElementById('name').value,
-        email: document.getElementById('email').value,
-        password: pw,
-        org: document.getElementById('org').value,
-        phone: document.getElementById('phone').value,
+        name:           document.getElementById('name').value,
+        email:          document.getElementById('email').value,
+        password:       pw,
+        org:            document.getElementById('org').value,
+        phone:          document.getElementById('phone').value,
         tax_categories,
       }),
     });
     const data = await res.json();
     if (!res.ok) {
       alert(data.error || '가입에 실패했습니다.');
-      btn.textContent = '가입 완료'; btn.disabled = false;
+      btn.textContent = '가입 완료 · 무료 시작';
+      btn.disabled = false;
       return;
     }
     localStorage.setItem('taxist_token', data.token);
     localStorage.setItem('taxist_user', JSON.stringify(data.user));
     const end = new Date(data.user.trial_ends_at);
     document.getElementById('trialEnd').textContent =
-      end.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
+      end.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
     goStep(4);
-    document.querySelector('.steps-nav').style.display = 'none';
+    document.querySelector('.progress-wrap').style.display = 'none';
   } catch {
     alert('서버 연결에 실패했습니다.');
-    btn.textContent = '가입 완료'; btn.disabled = false;
+    btn.textContent = '가입 완료 · 무료 시작';
+    btn.disabled = false;
   }
 }
 </script>

@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>마이페이지 — TAXIST</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand:       #1B2B4B;
+      --brand-dark:  #0F1E35;
+      --brand-mid:   #2E4370;
+      --brand-light: #EEF2FF;
+      --blue:        #1563FF;
+      --blue-dark:   #0F45B4;
+      --blue-light:  #E8F0FF;
+      --neutral-0:   #FFFFFF;
+      --neutral-50:  #FAFAFA;
+      --neutral-100: #F4F5F7;
+      --neutral-200: #E8E8E8;
+      --neutral-300: #CCCCCC;
+      --neutral-400: #999999;
+      --neutral-600: #555555;
+      --neutral-700: #3B3B3B;
+      --neutral-900: #1A1A1A;
+      --success:     #0D7F3F;
+      --success-light:#E6F6EE;
+      --success-border:#86EFAC;
+      --warning:     #92400E;
+      --warning-light:#FFFBEB;
+      --warning-border:#FDE68A;
+      --error:       #C82B2B;
+      --error-light: #FEF2F2;
+      --error-border:#FECACA;
+      --font: 'Inter', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --radius:    5px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 4px rgba(0,0,0,.07);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--neutral-100);
+      color: var(--neutral-900);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; border: none; font-family: var(--font); outline: none; }
+
+    /* ══ NAV ══ */
+    nav {
+      background: var(--neutral-0);
+      border-bottom: 1px solid var(--neutral-200);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav-inner {
+      max-width: 1000px; margin: 0 auto; padding: 0 32px;
+      height: 56px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-size: 1.15rem; font-weight: 800; color: var(--brand); letter-spacing: -.04em; }
+    .logo-dot { color: var(--blue); }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      padding: 6px 14px; border-radius: var(--radius);
+      font-size: .78rem; font-weight: 600; transition: all .15s;
+      background: transparent; border: 1px solid var(--neutral-200);
+      color: var(--neutral-600);
+    }
+    .nav-btn:hover { background: var(--neutral-100); border-color: var(--neutral-300); }
+    .nav-btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .nav-btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+    /* ══ LAYOUT ══ */
+    .page { max-width: 1000px; margin: 0 auto; padding: 36px 32px 80px; }
+    .page-title {
+      font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em;
+      margin-bottom: 6px;
+    }
+    .page-sub { font-size: .84rem; color: var(--neutral-400); margin-bottom: 32px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .col-left  { display: flex; flex-direction: column; gap: 16px; }
+    .col-right { display: flex; flex-direction: column; gap: 16px; }
+
+    /* ══ CARD ══ */
+    .card {
+      background: var(--neutral-0);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--neutral-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-head-title {
+      font-size: .78rem; font-weight: 700;
+      color: var(--neutral-600);
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .card-body { padding: 20px 24px; }
+
+    /* ══ AVATAR ══ */
+    .avatar-wrap { display: flex; flex-direction: column; align-items: center; padding: 28px 24px 20px; }
+    .avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: 800; color: #fff;
+      margin-bottom: 14px; flex-shrink: 0;
+    }
+    .avatar-name { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
+    .avatar-email { font-size: .8rem; color: var(--neutral-400); margin-bottom: 10px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: .72rem; font-weight: 700; padding: 4px 10px;
+      border-radius: 100px;
+    }
+    .status-badge.trial   { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning-border); }
+    .status-badge.active  { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+    .status-badge.expired { background: var(--error-light);   color: var(--error);   border: 1px solid var(--error-border); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* ══ 정보 목록 ══ */
+    .info-list { display: flex; flex-direction: column; gap: 0; }
+    .info-row {
+      display: flex; align-items: flex-start;
+      padding: 12px 0; border-bottom: 1px solid var(--neutral-100);
+      gap: 12px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { font-size: .75rem; font-weight: 600; color: var(--neutral-400); width: 72px; flex-shrink: 0; padding-top: 1px; }
+    .info-value { font-size: .88rem; color: var(--neutral-900); flex: 1; line-height: 1.5; }
+    .tax-chips  { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tax-chip {
+      font-size: .72rem; font-weight: 700; padding: 3px 9px;
+      border-radius: 100px;
+      background: var(--brand-light); color: var(--brand);
+      border: 1px solid rgba(27,43,75,.15);
+    }
+
+    /* ══ EDIT FORM ══ */
+    .edit-btn {
+      font-size: .75rem; font-weight: 600; padding: 4px 11px;
+      border-radius: var(--radius); border: 1px solid var(--neutral-200);
+      color: var(--neutral-600); background: transparent; transition: all .15s;
+    }
+    .edit-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .edit-form { display: none; flex-direction: column; gap: 14px; }
+    .edit-form.open { display: flex; }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-label { font-size: .75rem; font-weight: 600; color: var(--neutral-700); }
+    .field-input {
+      padding: 9px 12px; border: 1px solid var(--neutral-200);
+      border-radius: var(--radius); font-size: .875rem;
+      font-family: var(--font); color: var(--neutral-900);
+      background: var(--neutral-0); outline: none; transition: all .15s; width: 100%;
+    }
+    .field-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(21,99,255,.1); }
+    .tax-check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .tc-item { position: relative; }
+    .tc-item input { position: absolute; opacity: 0; pointer-events: none; }
+    .tc-item label {
+      display: flex; align-items: center; justify-content: center;
+      gap: 5px; padding: 8px 6px;
+      border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+      cursor: pointer; font-size: .78rem; font-weight: 600;
+      color: var(--neutral-500); background: var(--neutral-50);
+      transition: all .15s;
+    }
+    .tc-item label:hover { border-color: var(--blue); }
+    .tc-item input:checked + label { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }
+    .save-btn {
+      padding: 9px 20px; border-radius: var(--radius);
+      background: var(--brand); color: #fff; font-size: .875rem; font-weight: 700;
+      border: 1px solid var(--brand); transition: all .15s; align-self: flex-end;
+    }
+    .save-btn:hover { background: var(--brand-dark); }
+    .cancel-btn {
+      padding: 9px 16px; border-radius: var(--radius);
+      background: transparent; color: var(--neutral-600); font-size: .875rem; font-weight: 600;
+      border: 1px solid var(--neutral-200); transition: all .15s; align-self: flex-end;
+    }
+    .cancel-btn:hover { border-color: var(--neutral-400); }
+    .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ══ 이용권 현황 ══ */
+    .plan-status {
+      padding: 24px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px;
+    }
+    .plan-status-left {}
+    .plan-name { font-size: .78rem; font-weight: 700; color: var(--neutral-400); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .plan-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+    .plan-desc { font-size: .82rem; color: var(--neutral-400); line-height: 1.5; }
+    .plan-days {
+      display: flex; flex-direction: column; align-items: flex-end;
+    }
+    .days-num { font-size: 2rem; font-weight: 800; color: var(--brand); letter-spacing: -.04em; line-height: 1; }
+    .days-label { font-size: .72rem; color: var(--neutral-400); margin-top: 3px; }
+
+    .plan-bar-wrap { padding: 0 24px 20px; }
+    .plan-bar-meta { display: flex; justify-content: space-between; font-size: .72rem; color: var(--neutral-400); margin-bottom: 7px; }
+    .plan-bar { height: 6px; background: var(--neutral-200); border-radius: 100px; overflow: hidden; }
+    .plan-bar-fill { height: 100%; border-radius: 100px; background: var(--brand); transition: width .5s ease; }
+    .plan-bar-fill.warning { background: #F59E0B; }
+    .plan-bar-fill.danger  { background: var(--error); }
+    .plan-bar-fill.expired { background: var(--neutral-300); width: 100% !important; }
+
+    /* ══ 통계 ══ */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--neutral-200);
+      border-top: 1px solid var(--neutral-200);
+    }
+    .stat-cell { background: var(--neutral-0); padding: 16px 20px; text-align: center; }
+    .stat-num { font-size: 1.4rem; font-weight: 800; color: var(--brand); letter-spacing: -.04em; }
+    .stat-label { font-size: .72rem; color: var(--neutral-400); margin-top: 4px; }
+
+    /* ══ 요금제 카드 ══ */
+    .plans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 20px 24px; }
+    .plan-card {
+      border: 1.5px solid var(--neutral-200);
+      border-radius: var(--radius-md); padding: 22px 20px;
+      position: relative; transition: all .15s;
+    }
+    .plan-card:hover { border-color: var(--neutral-400); }
+    .plan-card.recommended {
+      border-color: var(--brand);
+      background: linear-gradient(160deg, #EEF2FF 0%, var(--neutral-0) 60%);
+    }
+    .plan-recommend-badge {
+      position: absolute; top: -10px; left: 18px;
+      background: var(--brand); color: #fff;
+      font-size: .68rem; font-weight: 700; padding: 3px 10px;
+      border-radius: 100px; letter-spacing: .04em;
+    }
+    .plan-card-name { font-size: .75rem; font-weight: 700; color: var(--neutral-400); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .plan-card-price { font-size: 1.6rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: 4px; }
+    .plan-card-price span { font-size: .85rem; font-weight: 500; color: var(--neutral-400); }
+    .plan-card-desc { font-size: .78rem; color: var(--neutral-400); margin-bottom: 16px; line-height: 1.5; }
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+    .plan-features li { display: flex; align-items: center; gap: 7px; font-size: .8rem; color: var(--neutral-700); }
+    .feat-check { color: var(--success); font-size: .85rem; flex-shrink: 0; }
+    .plan-btn {
+      width: 100%; padding: 10px;
+      border-radius: var(--radius); font-size: .875rem; font-weight: 700;
+      border: none; transition: all .15s;
+    }
+    .plan-btn-ghost { background: transparent; border: 1px solid var(--neutral-200) !important; color: var(--neutral-600); }
+    .plan-btn-ghost:hover { border-color: var(--neutral-400) !important; color: var(--neutral-900); }
+    .plan-btn-primary { background: var(--brand); color: #fff; }
+    .plan-btn-primary:hover { background: var(--brand-dark); }
+    .plan-btn-primary:disabled { background: var(--neutral-300); cursor: not-allowed; }
+
+    /* ══ MODAL ══ */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.45);
+      display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--neutral-0); border-radius: var(--radius-lg);
+      width: 100%; max-width: 480px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .modal-head {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--neutral-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-size: 1rem; font-weight: 800; }
+    .modal-close { background: none; border: none; color: var(--neutral-400); font-size: 1.2rem; padding: 0; cursor: pointer; transition: color .15s; }
+    .modal-close:hover { color: var(--neutral-900); }
+    .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+
+    /* 결제 선택 플랜 요약 */
+    .pay-plan-summary {
+      background: var(--neutral-50); border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-md); padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .pay-plan-name { font-size: .82rem; font-weight: 700; }
+    .pay-plan-price { font-size: 1.1rem; font-weight: 800; color: var(--brand); }
+
+    /* 결제 수단 */
+    .pay-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .pay-method {
+      position: relative;
+    }
+    .pay-method input { position: absolute; opacity: 0; pointer-events: none; }
+    .pay-method label {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px 8px;
+      border: 1.5px solid var(--neutral-200); border-radius: var(--radius-md);
+      cursor: pointer; font-size: .78rem; font-weight: 600; color: var(--neutral-600);
+      transition: all .15s;
+    }
+    .pay-method label:hover { border-color: var(--blue); }
+    .pay-method input:checked + label { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .pay-method-icon { font-size: 1.4rem; }
+
+    /* 결제 정보 입력 */
+    .pay-fields { display: flex; flex-direction: column; gap: 12px; }
+    .pay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pay-label { font-size: .75rem; font-weight: 600; color: var(--neutral-700); margin-bottom: 5px; display: block; }
+    .pay-input {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid var(--neutral-200); border-radius: var(--radius);
+      font-size: .875rem; font-family: var(--font); outline: none;
+      transition: all .15s;
+    }
+    .pay-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(21,99,255,.1); }
+    .pay-input::placeholder { color: var(--neutral-300); }
+
+    .pay-notice {
+      background: var(--warning-light); border: 1px solid var(--warning-border);
+      border-radius: var(--radius); padding: 10px 14px;
+      font-size: .76rem; color: var(--warning); line-height: 1.6;
+    }
+
+    .modal-foot {
+      padding: 16px 24px;
+      border-top: 1px solid var(--neutral-200);
+      display: flex; gap: 10px; justify-content: flex-end;
+    }
+    .modal-cancel {
+      padding: 9px 18px; border-radius: var(--radius);
+      background: transparent; border: 1px solid var(--neutral-200);
+      color: var(--neutral-600); font-size: .875rem; font-weight: 600;
+      transition: all .15s;
+    }
+    .modal-cancel:hover { border-color: var(--neutral-400); }
+    .modal-confirm {
+      padding: 9px 24px; border-radius: var(--radius);
+      background: var(--brand); color: #fff; font-size: .875rem; font-weight: 700;
+      border: none; transition: all .15s;
+    }
+    .modal-confirm:hover { background: var(--brand-dark); }
+
+    /* ══ 질문 이력 ══ */
+    .hist-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 0; border-bottom: 1px solid var(--neutral-100);
+      cursor: pointer; transition: all .12s;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item:hover { padding-left: 4px; }
+    .hist-cat {
+      font-size: .7rem; font-weight: 700; padding: 3px 8px;
+      border-radius: 100px; background: var(--blue-light); color: var(--blue);
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .hist-status-done   { font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 100px; background: var(--success-light); color: var(--success); flex-shrink: 0; }
+    .hist-status-error  { font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 100px; background: var(--error-light);   color: var(--error);   flex-shrink: 0; }
+    .hist-title { font-size: .85rem; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--neutral-700); }
+    .hist-date  { font-size: .72rem; color: var(--neutral-400); flex-shrink: 0; }
+    .hist-empty { font-size: .84rem; color: var(--neutral-400); padding: 16px 0; }
+
+    /* ══ 알림 토스트 ══ */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 300;
+      background: var(--neutral-900); color: #fff;
+      padding: 12px 20px; border-radius: var(--radius-md);
+      font-size: .84rem; font-weight: 600;
+      box-shadow: var(--shadow-md);
+      transform: translateY(80px); opacity: 0;
+      transition: all .25s ease;
+    }
+    .toast.show { transform: none; opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error   { background: var(--error); }
+
+    /* ══ RESPONSIVE ══ */
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .plans-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .page { padding: 24px 20px 60px; }
+      .pay-methods { grid-template-columns: repeat(3, 1fr); }
+      .pay-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
+    <div class="nav-right">
+      <a href="ask.html" class="nav-btn">← 질문 작성으로</a>
+      <button class="nav-btn" onclick="doLogout()">로그아웃</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ PAGE ══ -->
+<div class="page">
+  <h1 class="page-title">마이페이지</h1>
+  <p class="page-sub">계정 정보와 이용권 현황을 확인하고 관리할 수 있습니다.</p>
+
+  <div class="grid">
+
+    <!-- ── 왼쪽 컬럼 ── -->
+    <div class="col-left">
+
+      <!-- 프로필 카드 -->
+      <div class="card">
+        <div class="avatar-wrap">
+          <div class="avatar" id="avatarInitial">?</div>
+          <div class="avatar-name" id="profileName">로딩 중...</div>
+          <div class="avatar-email" id="profileEmail"></div>
+          <div class="status-badge trial" id="statusBadge">
+            <span class="status-dot"></span>
+            <span id="statusText">확인 중...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 내 정보 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-head-title">계정 정보</span>
+          <button class="edit-btn" id="editToggleBtn" onclick="toggleEdit()">편집</button>
+        </div>
+        <div class="card-body">
+          <div class="info-list" id="infoView">
+            <div class="info-row">
+              <span class="info-label">이름</span>
+              <span class="info-value" id="viewName">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">소속</span>
+              <span class="info-value" id="viewOrg">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">가입일</span>
+              <span class="info-value" id="viewJoined">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">담당세목</span>
+              <div class="info-value">
+                <div class="tax-chips" id="viewTaxes"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="edit-form" id="editForm">
+            <div class="field-group">
+              <span class="field-label">이름</span>
+              <input type="text" class="field-input" id="editName" placeholder="홍길동" />
+            </div>
+            <div class="field-group">
+              <span class="field-label">소속 기관</span>
+              <input type="text" class="field-input" id="editOrg" placeholder="○○세무서 법인세과" />
+            </div>
+            <div class="field-group">
+              <span class="field-label">담당 세목</span>
+              <div class="tax-check-grid">
+                <div class="tc-item"><input type="checkbox" id="ec_corporate" value="corporate_tax" /><label for="ec_corporate"><span>🏢</span> 법인세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_vat"       value="vat"           /><label for="ec_vat">      <span>🧾</span> 부가세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_audit"     value="audit"         /><label for="ec_audit">    <span>🔎</span> 조사</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_collect"   value="collection"    /><label for="ec_collect">  <span>📬</span> 징세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_property"  value="property_tax"  /><label for="ec_property"> <span>🏠</span> 재산세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_individual" value="individual_tax"/><label for="ec_individual"><span>👤</span> 개인세</label></div>
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button class="cancel-btn" onclick="toggleEdit(false)">취소</button>
+              <button class="save-btn" onclick="saveProfile()">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── 오른쪽 컬럼 ── -->
+    <div class="col-right">
+
+      <!-- 이용권 현황 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-head-title">이용권 현황</span>
+        </div>
+        <div class="plan-status">
+          <div class="plan-status-left">
+            <div class="plan-name">현재 플랜</div>
+            <div class="plan-value" id="planTitle">무료 체험</div>
+            <div class="plan-desc" id="planDesc">만료일을 확인하세요.</div>
+          </div>
+          <div class="plan-days">
+            <div class="days-num" id="daysNum">—</div>
+            <div class="days-label" id="daysLabel">일 남음</div>
+          </div>
+        </div>
+        <div class="plan-bar-wrap">
+          <div class="plan-bar-meta">
+            <span id="barStart">가입일</span>
+            <span id="barEnd">만료일</span>
+          </div>
+          <div class="plan-bar">
+            <div class="plan-bar-fill" id="planBarFill" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-cell">
+            <div class="stat-num" id="statQuestions">—</div>
+            <div class="stat-label">총 질문 수</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num" id="statJoinDays">—</div>
+            <div class="stat-label">가입 경과일</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num" id="statLastLogin">—</div>
+            <div class="stat-label">최근 접속</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 요금제 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-head-title">요금제</span>
+        </div>
+        <div class="plans-grid">
+          <!-- 무료 체험 -->
+          <div class="plan-card">
+            <div class="plan-card-name">무료 체험</div>
+            <div class="plan-card-price">₩0 <span>/ 1개월</span></div>
+            <div class="plan-card-desc">가입 후 1개월, 최대 5건 질문 가능</div>
+            <ul class="plan-features">
+              <li><span class="feat-check">✓</span> 질문 5건 이용 가능</li>
+              <li><span class="feat-check">✓</span> AI 답변 생성</li>
+              <li><span class="feat-check">✓</span> 법령·판례 조회</li>
+              <li><span class="feat-check">✓</span> 6개 세목 전체 접근</li>
+            </ul>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <button class="plan-btn plan-btn-ghost" disabled>현재 이용 중</button>
+              <div style="text-align:center;font-size:.72rem;color:var(--neutral-400);" id="trialUsageText">질문 사용량 확인 중...</div>
+            </div>
+          </div>
+
+          <!-- 정식 이용권 -->
+          <div class="plan-card recommended">
+            <div class="plan-recommend-badge">추천</div>
+            <div class="plan-card-name">정식 이용권</div>
+            <div class="plan-card-price">₩29,000 <span>/ 월</span></div>
+            <div class="plan-card-desc">무료 체험 종료 후 계속 이용하기</div>
+            <ul class="plan-features">
+              <li><span class="feat-check">✓</span> 무료 체험 모든 기능 포함</li>
+              <li><span class="feat-check">✓</span> PDF·DOCX 보고서 출력</li>
+              <li><span class="feat-check">✓</span> 질문 이력 무제한 보관</li>
+              <li><span class="feat-check">✓</span> 우선 답변 처리</li>
+            </ul>
+            <button class="plan-btn plan-btn-primary" onclick="openPayModal('monthly')">이용권 구매하기</button>
+          </div>
+        </div>
+
+        <!-- 기관 요금 문의 -->
+        <div style="padding: 0 24px 20px;">
+          <div style="background: var(--neutral-50); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div>
+              <div style="font-size:.82rem;font-weight:700;margin-bottom:4px;">기관 단위 계정 문의</div>
+              <div style="font-size:.76rem;color:var(--neutral-400);line-height:1.5;">팀 또는 기관 전체 도입은 별도 문의해 주세요.</div>
+            </div>
+            <button class="nav-btn" onclick="alert('준비 중입니다. 이메일로 문의해 주세요.')">문의하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 최근 질문 이력 -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-head-title">최근 질문 이력</span>
+          <a href="ask.html" style="font-size:.75rem;color:var(--blue);font-weight:600;">전체 보기 →</a>
+        </div>
+        <div class="card-body">
+          <div id="histList"><p class="hist-empty">불러오는 중...</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ 결제 모달 ══ -->
+<div class="modal-backdrop" id="payModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">이용권 구매</span>
+      <button class="modal-close" onclick="closePayModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- 선택 플랜 요약 -->
+      <div class="pay-plan-summary">
+        <div>
+          <div class="pay-plan-name">정식 이용권 · 1개월</div>
+          <div style="font-size:.76rem;color:var(--neutral-400);margin-top:3px;">결제 후 30일간 이용 가능</div>
+        </div>
+        <div class="pay-plan-price">₩29,000</div>
+      </div>
+
+      <!-- 결제 수단 -->
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--neutral-700);margin-bottom:10px;">결제 수단</div>
+        <div class="pay-methods">
+          <div class="pay-method">
+            <input type="radio" name="payMethod" id="pm_card" value="card" checked />
+            <label for="pm_card">
+              <span class="pay-method-icon">💳</span>신용카드
+            </label>
+          </div>
+          <div class="pay-method">
+            <input type="radio" name="payMethod" id="pm_bank" value="bank" />
+            <label for="pm_bank">
+              <span class="pay-method-icon">🏦</span>계좌이체
+            </label>
+          </div>
+          <div class="pay-method">
+            <input type="radio" name="payMethod" id="pm_virt" value="virt" />
+            <label for="pm_virt">
+              <span class="pay-method-icon">📄</span>가상계좌
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 카드 정보 -->
+      <div class="pay-fields" id="cardFields">
+        <div class="field-group">
+          <label class="pay-label">카드 번호</label>
+          <input type="text" class="pay-input" placeholder="0000 - 0000 - 0000 - 0000"
+                 oninput="fmtCard(this)" maxlength="19" />
+        </div>
+        <div class="pay-row">
+          <div class="field-group">
+            <label class="pay-label">유효기간 (MM/YY)</label>
+            <input type="text" class="pay-input" placeholder="MM / YY"
+                   oninput="fmtExpiry(this)" maxlength="7" />
+          </div>
+          <div class="field-group">
+            <label class="pay-label">CVC</label>
+            <input type="text" class="pay-input" placeholder="000"
+                   oninput="this.value=this.value.replace(/\D/g,'').slice(0,3)" maxlength="3" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="pay-label">카드 소유자명</label>
+          <input type="text" class="pay-input" placeholder="카드에 표기된 이름" />
+        </div>
+      </div>
+
+      <div class="pay-notice">
+        ⚠️ 현재 결제 시스템 연동 준비 중입니다. 결제 정보는 저장되지 않으며,<br>
+        결제 완료 후 이용 기간 연장은 관리자가 수동으로 처리해 드립니다.<br>
+        문의: <strong>taxist@example.com</strong>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="modal-cancel" onclick="closePayModal()">취소</button>
+      <button class="modal-confirm" onclick="submitPayment()">₩29,000 결제하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 토스트 ══ -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── 인증 ── */
+const _token = localStorage.getItem('taxist_token');
+const _user  = JSON.parse(localStorage.getItem('taxist_user') || 'null');
+if (!_token || !_user) { window.location.href = 'index.html'; }
+
+function doLogout() {
+  ['taxist_token','taxist_user','userAuth','userName','adminAuth','adminName']
+    .forEach(k => localStorage.removeItem(k));
+  window.location.href = 'index.html';
+}
+
+/* ── 토스트 ── */
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+/* ── 날짜 포맷 ── */
+function fmtDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
+}
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+function daysFromNow(str) {
+  return Math.max(0, Math.ceil((new Date(str) - Date.now()) / 86400000));
+}
+
+/* ── 프로필 로드 ── */
+async function loadProfile() {
+  try {
+    const res  = await fetch('/api/users/me', { headers: { Authorization: `Bearer ${_token}` } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    renderProfile(data.user);
+  } catch (e) {
+    showToast('프로필 로드 실패: ' + e.message, 'error');
+  }
+}
+
+function renderProfile(u) {
+  /* 아바타 */
+  document.getElementById('avatarInitial').textContent = (u.name || '?')[0];
+  document.getElementById('profileName').textContent   = u.name;
+  document.getElementById('profileEmail').textContent  = u.email;
+
+  /* 상태 배지 */
+  const badge = document.getElementById('statusBadge');
+  const statusMap = { trial:'무료 이용중', active:'이용중', expired:'만료됨', suspended:'이용정지' };
+  badge.className = 'status-badge ' + (u.status === 'active' ? 'active' : u.status === 'expired' ? 'expired' : 'trial');
+  document.getElementById('statusText').textContent = statusMap[u.status] || u.status;
+
+  /* 정보 목록 */
+  document.getElementById('viewName').textContent   = u.name;
+  document.getElementById('viewOrg').textContent    = u.org || '—';
+  document.getElementById('viewJoined').textContent = fmtDate(u.joined_at);
+  const taxEl = document.getElementById('viewTaxes');
+  taxEl.innerHTML = (u.tax_categories || []).map(t => `<span class="tax-chip">${t}</span>`).join('') || '—';
+
+  /* 편집 폼 초기값 */
+  document.getElementById('editName').value = u.name;
+  document.getElementById('editOrg').value  = u.org || '';
+  document.querySelectorAll('.tc-item input').forEach(cb => {
+    cb.checked = (u.tax_categories || []).includes(cb.value);
+  });
+
+  /* 이용권 현황 */
+  const joined   = u.joined_at;
+  const trialEnd = u.trial_ends_at;
+  const now      = new Date();
+
+  if (u.status === 'trial' && trialEnd) {
+    const daysLeft = daysFromNow(trialEnd);
+    const total    = daysBetween(joined, trialEnd);
+    const elapsed  = daysBetween(joined, now.toISOString());
+    const pct      = Math.min(100, Math.round((elapsed / total) * 100));
+
+    document.getElementById('planTitle').textContent = '무료 체험';
+    document.getElementById('planDesc').textContent  = `만료일: ${fmtDate(trialEnd)}`;
+    document.getElementById('daysNum').textContent   = daysLeft;
+    document.getElementById('daysLabel').textContent = '일 남음';
+
+    const fill = document.getElementById('planBarFill');
+    fill.style.width = pct + '%';
+    fill.className   = 'plan-bar-fill' + (daysLeft <= 7 ? ' danger' : daysLeft <= 14 ? ' warning' : '');
+
+    document.getElementById('barStart').textContent = fmtDate(joined);
+    document.getElementById('barEnd').textContent   = fmtDate(trialEnd);
+
+  } else if (u.status === 'expired') {
+    document.getElementById('planTitle').textContent  = '이용 만료';
+    document.getElementById('planDesc').textContent   = '이용권을 구매하면 계속 사용할 수 있습니다.';
+    document.getElementById('daysNum').textContent    = '0';
+    document.getElementById('daysLabel').textContent  = '일 남음';
+    const fill = document.getElementById('planBarFill');
+    fill.style.width = '100%'; fill.className = 'plan-bar-fill expired';
+
+  } else if (u.status === 'active') {
+    document.getElementById('planTitle').textContent = '정식 이용권';
+    document.getElementById('planDesc').textContent  = '이용 중';
+    document.getElementById('daysNum').textContent   = '∞';
+    document.getElementById('daysLabel').textContent = '';
+    document.getElementById('planBarFill').style.width = '100%';
+  }
+
+  /* 통계 */
+  document.getElementById('statQuestions').textContent = u.question_count ?? 0;
+  document.getElementById('statJoinDays').textContent  = daysBetween(joined, now.toISOString()) + '일';
+  document.getElementById('statLastLogin').textContent =
+    u.last_login_at ? fmtDate(u.last_login_at).replace(/\d{4}년 /, '') : '—';
+}
+
+/* ── 편집 토글 ── */
+function toggleEdit(open) {
+  const isOpen = open !== undefined ? open : document.getElementById('editForm').classList.contains('open') === false;
+  document.getElementById('editForm').classList.toggle('open', isOpen);
+  document.getElementById('infoView').style.display  = isOpen ? 'none' : '';
+  document.getElementById('editToggleBtn').textContent = isOpen ? '취소' : '편집';
+}
+
+/* ── 프로필 저장 ── */
+async function saveProfile() {
+  const name = document.getElementById('editName').value.trim();
+  const org  = document.getElementById('editOrg').value.trim();
+  const tax_categories = [...document.querySelectorAll('.tc-item input:checked')].map(c => c.value);
+
+  if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+  if (!tax_categories.length) { showToast('세목을 1개 이상 선택해주세요.', 'error'); return; }
+
+  try {
+    const res = await fetch('/api/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_token}` },
+      body: JSON.stringify({ name, org, tax_categories }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+
+    /* localStorage 동기화 */
+    const updated = { ..._user, name, org, tax_categories };
+    localStorage.setItem('taxist_user', JSON.stringify(updated));
+
+    await loadProfile();
+    toggleEdit(false);
+    showToast('프로필이 저장되었습니다.', 'success');
+  } catch (e) {
+    showToast('저장 실패: ' + e.message, 'error');
+  }
+}
+
+/* ── 질문 이력 ── */
+async function loadHistory() {
+  try {
+    const res  = await fetch('/api/questions', { headers: { Authorization: `Bearer ${_token}` } });
+    const data = await res.json();
+
+    // 무료 체험 사용량 표시
+    const usageEl = document.getElementById('trialUsageText');
+    if (usageEl && data.trial_remaining !== null && data.trial_remaining !== undefined) {
+      const used = data.trial_limit - data.trial_remaining;
+      usageEl.textContent = `${used} / ${data.trial_limit}건 사용`;
+      usageEl.style.color = data.trial_remaining === 0 ? 'var(--error)' : data.trial_remaining <= 2 ? '#D97706' : 'var(--neutral-400)';
+    } else if (usageEl) {
+      usageEl.textContent = '';
+    }
+    const list = (data.questions || []).slice(0, 8);
+    const el   = document.getElementById('histList');
+    if (!list.length) {
+      el.innerHTML = '<p class="hist-empty">아직 질문이 없습니다. <a href="ask.html" style="color:var(--blue);font-weight:600">질문 작성하러 가기 →</a></p>';
+      return;
+    }
+    el.innerHTML = list.map(q => {
+      const statusEl = q.status === 'done'
+        ? `<span class="hist-status-done">완료</span>`
+        : q.status === 'error'
+          ? `<span class="hist-status-error">오류</span>` : '';
+      return `<div class="hist-item" onclick="window.location.href='ask.html'">
+        <span class="hist-cat">${q.tax_category || '—'}</span>
+        ${statusEl}
+        <span class="hist-title">${q.title || '(제목 없음)'}</span>
+        <span class="hist-date">${(q.created_at || '').slice(0,10)}</span>
+      </div>`;
+    }).join('');
+  } catch {
+    document.getElementById('histList').innerHTML = '<p class="hist-empty">이력을 불러오지 못했습니다.</p>';
+  }
+}
+
+/* ── 결제 모달 ── */
+function openPayModal() {
+  document.getElementById('payModal').classList.add('open');
+}
+function closePayModal() {
+  document.getElementById('payModal').classList.remove('open');
+}
+document.getElementById('payModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePayModal();
+});
+
+/* 결제 수단 전환 */
+document.querySelectorAll('input[name="payMethod"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const show = r.value === 'card';
+    document.getElementById('cardFields').style.display = show ? '' : 'none';
+  });
+});
+
+/* 카드번호 포맷 */
+function fmtCard(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 16);
+  el.value = v.replace(/(\d{4})(?=\d)/g, '$1 - ');
+}
+function fmtExpiry(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 4);
+  if (v.length >= 3) v = v.slice(0,2) + ' / ' + v.slice(2);
+  el.value = v;
+}
+
+/* 결제 제출 (현재는 확인 메시지) */
+async function submitPayment() {
+  showToast('결제 요청이 접수되었습니다. 관리자가 확인 후 이용 기간을 연장해 드립니다.', 'success');
+  closePayModal();
+}
+
+/* ── 초기화 ── */
+loadProfile();
+loadHistory();
+</script>
+</body>
+</html>

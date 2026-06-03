@@ -1,4 +1,61 @@
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const MODEL   = "gemini-2.5-flash";
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+
+// 503 과부하 시 재시도 설정
+const MAX_RETRIES  = 4;          // 최대 4회 재시도 (총 5번 시도)
+const RETRY_DELAY  = 5000;       // 재시도 간격 5초
+
+async function callGemini(prompt, apiKey) {
+  const url = `${BASE_URL}/${MODEL}:generateContent?key=${apiKey}`;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      console.log(`[Gemini] ${attempt}차 재시도 중... (${RETRY_DELAY / 1000}초 대기 후)`);
+      await new Promise(r => setTimeout(r, RETRY_DELAY));
+    }
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.15, topP: 0.85 },
+        safetySettings: [{ category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }],
+      }),
+    });
+
+    // 성공
+    if (resp.ok) {
+      const data = await resp.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("Gemini 응답이 비어있습니다");
+      if (attempt > 0) console.log(`[Gemini] ${attempt}차 재시도에서 성공`);
+      return text;
+    }
+
+    // 503 과부하 → 재시도
+    if (resp.status === 503) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[Gemini] 503 과부하 (${attempt + 1}/${MAX_RETRIES + 1}회 시도), ${RETRY_DELAY / 1000}초 후 재시도`);
+        continue;
+      }
+      throw new Error("서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    // 429 할당량 초과 → 재시도
+    if (resp.status === 429) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[Gemini] 429 할당량 초과, ${RETRY_DELAY / 1000}초 후 재시도`);
+        continue;
+      }
+      throw new Error("API 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    // 그 외 에러는 즉시 throw
+    const body = await resp.text();
+    throw new Error(`Gemini API 오류 (${resp.status}): ${body}`);
+  }
+}
 
 export async function generateAnswer(question, taxCategory, documents, apiKey) {
   const docText = documents.length
@@ -94,30 +151,7 @@ ${question}
 ---
 ※ 본 회신은 AI가 생성한 참고용 검토 의견으로, 제공된 자료의 범위 내에서 작성되었습니다. 구체적 사실관계에 따라 결론이 달라질 수 있으며, 최종 법적 판단의 책임은 담당자에게 있습니다.`;
 
-  const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.15,
-        topP: 0.85,
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-      ],
-    }),
-  });
-
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Gemini API 오류 (${resp.status}): ${err}`);
-  }
-
-  const data = await resp.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini 응답이 비어있습니다");
+  const text = await callGemini(prompt, apiKey);
 
   const sources = documents.map(d => d.name);
   return { content: text, sources };

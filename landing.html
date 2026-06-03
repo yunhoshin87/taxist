@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TAXIST — 세무공무원을 위한 AI 질의응답</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design Tokens (HashiCorp Helios-inspired) ── */
+    :root {
+      --brand:       #1B2B4B;
+      --brand-dark:  #0F1E35;
+      --brand-mid:   #2E4370;
+      --brand-light: #EEF2FF;
+
+      --blue:        #1563FF;
+      --blue-dark:   #0F45B4;
+      --blue-light:  #E8F0FF;
+
+      --neutral-0:   #FFFFFF;
+      --neutral-50:  #FAFAFA;
+      --neutral-100: #F5F5F5;
+      --neutral-200: #E8E8E8;
+      --neutral-300: #CCCCCC;
+      --neutral-400: #999999;
+      --neutral-600: #555555;
+      --neutral-700: #3B3B3B;
+      --neutral-900: #1A1A1A;
+
+      --font: 'Inter', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --radius:    5px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-xs: 0 1px 2px rgba(0,0,0,.06);
+      --shadow-sm: 0 1px 4px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: var(--font);
+      background: var(--neutral-0);
+      color: var(--neutral-900);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; border: none; outline: none; font-family: inherit; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--neutral-0);
+      border-bottom: 1px solid var(--neutral-200);
+    }
+    .nav-inner {
+      max-width: 1100px; margin: 0 auto; padding: 0 32px;
+      height: 60px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      font-size: 1.2rem; font-weight: 800;
+      color: var(--brand); letter-spacing: -.04em;
+    }
+    .logo-dot { color: var(--blue); }
+    .nav-actions { display: flex; gap: 10px; align-items: center; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--font); font-size: .875rem; font-weight: 600;
+      border-radius: var(--radius); padding: 8px 18px;
+      transition: all .15s ease; cursor: pointer; border: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--neutral-300);
+      color: var(--neutral-700);
+    }
+    .btn-ghost:hover {
+      border-color: var(--neutral-700);
+      color: var(--neutral-900);
+      background: var(--neutral-100);
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      border: 1px solid var(--blue);
+    }
+    .btn-primary:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
+
+    .btn-brand {
+      background: var(--brand);
+      color: #fff;
+      border: 1px solid var(--brand);
+    }
+    .btn-brand:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+    /* ── HERO ── */
+    .hero {
+      background: var(--brand);
+      padding: 96px 32px 96px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(21,99,255,.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-inner { max-width: 680px; margin: 0 auto; position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 100px; padding: 5px 14px;
+      font-size: .78rem; font-weight: 600;
+      color: rgba(255,255,255,.8);
+      margin-bottom: 28px;
+      letter-spacing: .04em;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #4ADE80; flex-shrink: 0;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.2;
+      letter-spacing: -.04em;
+      margin-bottom: 20px;
+    }
+    .hero h1 em { color: #93C5FD; font-style: normal; }
+    .hero-desc {
+      font-size: 1.05rem;
+      color: rgba(255,255,255,.65);
+      line-height: 1.75;
+      margin-bottom: 44px;
+      max-width: 520px;
+      margin-left: auto; margin-right: auto;
+    }
+    .hero-ctas {
+      display: flex; gap: 12px; justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-hero-primary {
+      padding: 13px 32px;
+      font-size: 1rem; font-weight: 700;
+      background: #fff; color: var(--brand);
+      border-radius: var(--radius-md);
+      border: none;
+      box-shadow: var(--shadow-md);
+      transition: all .15s;
+    }
+    .btn-hero-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,0,0,.15);
+    }
+    .btn-hero-secondary {
+      padding: 13px 32px;
+      font-size: 1rem; font-weight: 600;
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: var(--radius-md);
+      transition: all .15s;
+    }
+    .btn-hero-secondary:hover { background: rgba(255,255,255,.18); }
+    .hero-note {
+      margin-top: 20px;
+      font-size: .78rem;
+      color: rgba(255,255,255,.35);
+    }
+
+    /* ── DIVIDER STRIP ── */
+    .strip {
+      background: var(--neutral-900);
+      padding: 28px 32px;
+      border-top: 1px solid #111;
+    }
+    .strip-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; justify-content: center; gap: 64px; flex-wrap: wrap;
+    }
+    .strip-item { text-align: center; }
+    .strip-num {
+      font-size: 1.6rem; font-weight: 800; color: #fff;
+      letter-spacing: -.04em;
+    }
+    .strip-num span { color: var(--blue); }
+    .strip-label {
+      font-size: .78rem; color: var(--neutral-400);
+      margin-top: 4px;
+    }
+
+    /* ── FEATURES ── */
+    .features { padding: 80px 32px; background: var(--neutral-50); }
+    .features-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      display: inline-block;
+      font-size: .72rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 1.6rem; font-weight: 800;
+      color: var(--neutral-900);
+      letter-spacing: -.03em;
+      margin-bottom: 8px;
+    }
+    .section-sub {
+      font-size: .92rem;
+      color: var(--neutral-400);
+      line-height: 1.7;
+      max-width: 480px;
+      margin-bottom: 48px;
+    }
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--neutral-200);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .feat-item {
+      background: var(--neutral-0);
+      padding: 32px 28px;
+    }
+    .feat-icon {
+      width: 36px; height: 36px;
+      background: var(--blue-light);
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+    }
+    .feat-item h3 {
+      font-size: .95rem; font-weight: 700;
+      color: var(--neutral-900);
+      margin-bottom: 8px;
+    }
+    .feat-item p {
+      font-size: .84rem;
+      color: var(--neutral-400);
+      line-height: 1.7;
+    }
+
+    /* ── HOW ── */
+    .how { padding: 80px 32px; background: var(--neutral-0); }
+    .how-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 2fr; gap: 80px; align-items: start;
+    }
+    .how-steps { display: flex; flex-direction: column; gap: 0; }
+    .how-step {
+      display: flex; gap: 16px;
+      padding: 20px 0; border-bottom: 1px solid var(--neutral-200);
+    }
+    .how-step:last-child { border-bottom: none; }
+    .how-step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      font-size: .78rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .how-step h4 { font-size: .9rem; font-weight: 700; margin-bottom: 4px; }
+    .how-step p { font-size: .82rem; color: var(--neutral-400); line-height: 1.65; }
+
+    /* ── CTA ── */
+    .cta {
+      background: var(--neutral-100);
+      border-top: 1px solid var(--neutral-200);
+      border-bottom: 1px solid var(--neutral-200);
+      padding: 64px 32px;
+      text-align: center;
+    }
+    .cta-inner { max-width: 560px; margin: 0 auto; }
+    .cta h2 {
+      font-size: 1.6rem; font-weight: 800;
+      letter-spacing: -.03em; margin-bottom: 10px;
+    }
+    .cta p {
+      font-size: .92rem; color: var(--neutral-400);
+      margin-bottom: 32px;
+    }
+    .cta-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-cta-primary {
+      padding: 12px 28px; font-size: .95rem; font-weight: 700;
+      background: var(--brand); color: #fff;
+      border-radius: var(--radius-md); border: none;
+      transition: all .15s;
+    }
+    .btn-cta-primary:hover { background: var(--brand-dark); }
+    .btn-cta-ghost {
+      padding: 12px 28px; font-size: .95rem; font-weight: 600;
+      background: transparent; color: var(--neutral-700);
+      border: 1px solid var(--neutral-300);
+      border-radius: var(--radius-md);
+      transition: all .15s;
+    }
+    .btn-cta-ghost:hover { border-color: var(--neutral-700); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--neutral-900);
+      padding: 40px 32px;
+      border-top: 1px solid #2a2a2a;
+    }
+    .footer-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .footer-logo {
+      font-size: 1.1rem; font-weight: 800;
+      color: #fff; letter-spacing: -.04em;
+    }
+    .footer-logo-dot { color: var(--blue); }
+    .footer-text {
+      font-size: .78rem; color: var(--neutral-400); line-height: 1.6;
+    }
+    .footer-links {
+      display: flex; gap: 20px;
+    }
+    .footer-links a { font-size: .78rem; color: var(--neutral-400); transition: color .15s; }
+    .footer-links a:hover { color: #fff; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .feat-grid { grid-template-columns: 1fr; }
+      .how-inner { grid-template-columns: 1fr; gap: 40px; }
+      .strip-inner { gap: 32px; }
+      .footer-inner { flex-direction: column; text-align: center; }
+      .footer-links { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
+    <div class="nav-actions" id="navActions">
+      <a href="login.html" class="btn btn-ghost">로그인</a>
+      <a href="signup.html" class="btn btn-brand">무료 시작하기</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      세무공무원 전용 · AI 질의응답 서비스
+    </div>
+    <h1>세무행정 질의에<br><em>AI 답변</em>을 즉시 받으세요</h1>
+    <p class="hero-desc">
+      법령·판례·해석례·내부 자료를 기반으로<br>
+      국세청 질의회신 형식의 검토 의견을 생성합니다.
+    </p>
+    <div class="hero-ctas">
+      <a href="signup.html" class="btn-hero-primary">무료로 시작하기 →</a>
+      <a href="login.html" class="btn-hero-secondary">로그인</a>
+    </div>
+    <p class="hero-note">결제 정보 없이 1개월 무료 · 언제든 해지 가능</p>
+  </div>
+</section>
+
+<!-- ═══ STRIP ═══ -->
+<div class="strip">
+  <div class="strip-inner">
+    <div class="strip-item">
+      <div class="strip-num">6<span>개</span></div>
+      <div class="strip-label">지원 세목</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-num">5<span>단계</span></div>
+      <div class="strip-label">검토 프로세스</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-num">1<span>개월</span></div>
+      <div class="strip-label">무료 이용</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-num">PDF</div>
+      <div class="strip-label">보고서 출력</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="features">
+  <div class="features-inner">
+    <div class="section-label">주요 기능</div>
+    <h2 class="section-title">실무에 필요한 핵심 기능</h2>
+    <p class="section-sub">세무행정 현장의 질의 처리 흐름을 AI로 디지털화했습니다.</p>
+
+    <div class="feat-grid">
+      <div class="feat-item">
+        <div class="feat-icon">⚖️</div>
+        <h3>법령·판례 자동 조회</h3>
+        <p>FTS5 전문검색으로 관련 법령·판례·해석례를 실시간 조회하여 정확한 근거를 제시합니다.</p>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📁</div>
+        <h3>내부 자료 기반 답변</h3>
+        <p>관리자가 업로드한 업무 지침, 사례집, 조례 등 허용된 폴더트리 내 자료만 근거로 활용합니다.</p>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📝</div>
+        <h3>실무형 보고서 출력</h3>
+        <p>질의요지부터 종합 검토의견까지 국세청 질의회신 형식으로 PDF·DOCX 즉시 내려받기.</p>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">🔍</div>
+        <h3>출처 완전 투명화</h3>
+        <p>모든 답변에 사용된 법령, 판례, 내부 자료의 출처를 명시합니다. 근거 없는 단정을 차단합니다.</p>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">🏛️</div>
+        <h3>6개 세목 전문화</h3>
+        <p>법인세·부가세·조사·징세·재산세·개인세 세목별로 자료 접근 범위와 답변을 세분화합니다.</p>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">🛡️</div>
+        <h3>관리자 권한 관리</h3>
+        <p>회원 상태 관리, 자료 업로드, 질문 감수 등 관리자와 일반 회원 권한을 완전히 분리합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="how">
+  <div class="how-inner">
+    <div>
+      <div class="section-label">검토 프로세스</div>
+      <h2 class="section-title">5단계 체계적 검토</h2>
+      <p class="section-sub">단순 키워드 검색이 아닙니다. 실무 전문가의 검토 순서를 그대로 따릅니다.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-num">1</div>
+        <div>
+          <h4>질문 내용 분석</h4>
+          <p>질의 요지·사실관계·세목·판단 필요사항을 자동 추출합니다.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">2</div>
+        <div>
+          <h4>법령·판례 조회</h4>
+          <p>핵심 키워드로 유사 판례·결정례·해석례를 실시간 조회합니다.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">3</div>
+        <div>
+          <h4>조례·지침 검토</h4>
+          <p>판례 기반 쟁점에 맞는 조례·시행규칙·고시·내부 지침을 확인합니다.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">4</div>
+        <div>
+          <h4>업로드 자료 조회</h4>
+          <p>허용 폴더트리 내 MD 파일·책 자료만 근거로 활용하여 출처를 명기합니다.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">5</div>
+        <div>
+          <h4>보고서 형식 답변</h4>
+          <p>판례 기반 해석 의견을 국세청 질의회신 형식으로 최종 작성합니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta">
+  <div class="cta-inner">
+    <h2>지금 바로 무료로 시작하세요</h2>
+    <p>신용카드 없이 1분 가입 · 1개월 무료 · 언제든 해지 가능</p>
+    <div class="cta-btns">
+      <a href="signup.html" class="btn-cta-primary">무료 회원가입</a>
+      <a href="login.html" class="btn-cta-ghost">이미 계정이 있으신가요?</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-logo">TAXIST<span class="footer-logo-dot">.</span></div>
+      <p class="footer-text" style="margin-top:8px">세무행정 AI 질의응답 서비스</p>
+    </div>
+    <p class="footer-text" style="text-align:center;max-width:400px">
+      © 2025 TAXIST. 본 서비스는 참고용 검토 의견을 제공하며,<br>최종 법적 판단의 책임은 담당자에게 있습니다.
+    </p>
+    <div class="footer-links">
+      <a href="#">이용약관</a>
+      <a href="#">개인정보처리방침</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  /* 로그인 상태 반영 */
+  const _user = JSON.parse(localStorage.getItem('taxist_user') || 'null');
+  if (_user) {
+    const dest  = _user.role === 'admin' ? 'admin/dashboard.html' : 'ask.html';
+    const label = _user.role === 'admin' ? '대시보드로 이동' : '질문하기';
+    document.getElementById('navActions').innerHTML =
+      `<span style="font-size:.82rem;color:var(--neutral-400)">${_user.name}님</span>
+       <a href="${dest}" class="btn btn-brand">${label}</a>`;
+  }
+</script>
+</body>
+</html>

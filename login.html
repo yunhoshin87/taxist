@@ -3,178 +3,273 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>로그인 — TAXIST | 세무행정 AI 질의응답</title>
+  <title>로그인 — TAXIST</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --coral: #E05B4B; --coral-dark: #C24636; --coral-light: #FFF0EE;
-      --navy: #1B2B4B; --navy-mid: #2E4370;
-      --bg: #F7F5F2; --bg-card: #FFFFFF;
-      --text: #222831; --text-muted: #6B7280;
-      --border: #E5E7EB;
-      --radius-sm: 8px; --radius-md: 16px; --radius-lg: 24px;
-      --shadow-md: 0 4px 20px rgba(0,0,0,.10);
+      --brand:       #1B2B4B;
+      --brand-dark:  #0F1E35;
+      --brand-mid:   #2E4370;
+      --brand-light: #EEF2FF;
+      --blue:        #1563FF;
+      --blue-dark:   #0F45B4;
+      --blue-light:  #E8F0FF;
+      --neutral-0:   #FFFFFF;
+      --neutral-50:  #FAFAFA;
+      --neutral-100: #F5F5F5;
+      --neutral-200: #E8E8E8;
+      --neutral-300: #CCCCCC;
+      --neutral-400: #999999;
+      --neutral-600: #555555;
+      --neutral-700: #3B3B3B;
+      --neutral-900: #1A1A1A;
+      --error:       #C82B2B;
+      --error-light: #FEF2F2;
+      --error-border:#FECACA;
+      --font: 'Inter', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --radius:    5px;
+      --radius-md: 8px;
     }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
-           background: var(--bg); color: var(--text); min-height: 100vh;
-           display: flex; flex-direction: column; }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font);
+      background: var(--neutral-100);
+      color: var(--neutral-900);
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
     a { text-decoration: none; color: inherit; }
 
-    /* layout */
-    .page { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    /* ── HEADER ── */
+    header {
+      background: var(--neutral-0);
+      border-bottom: 1px solid var(--neutral-200);
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .logo {
+      font-size: 1.15rem; font-weight: 800;
+      color: var(--brand); letter-spacing: -.04em;
+    }
+    .logo-dot { color: var(--blue); }
+    .header-link { font-size: .82rem; color: var(--neutral-400); }
+    .header-link a { color: var(--blue); font-weight: 600; }
+    .header-link a:hover { color: var(--blue-dark); }
 
-    /* left panel */
-    .panel-left {
-      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
-      display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-      padding: 60px 64px; position: relative; overflow: hidden;
+    /* ── MAIN ── */
+    main {
+      flex: 1; display: flex;
+      align-items: center; justify-content: center;
+      padding: 48px 24px;
     }
-    .panel-left::before {
-      content: ''; position: absolute; bottom: -80px; right: -80px;
-      width: 320px; height: 320px; border-radius: 50%;
-      background: rgba(224,91,75,.2);
-    }
-    .panel-left::after {
-      content: ''; position: absolute; top: -60px; left: -60px;
-      width: 200px; height: 200px; border-radius: 50%;
-      background: rgba(255,255,255,.04);
-    }
-    .logo { font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: -.04em;
-            margin-bottom: 48px; position: relative; z-index: 1; }
-    .logo span { color: var(--coral); }
-    .panel-left h2 { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1.3;
-                     margin-bottom: 20px; position: relative; z-index: 1; }
-    .panel-left h2 em { color: var(--coral); font-style: normal; }
-    .panel-left p { color: rgba(255,255,255,.6); font-size: .95rem; line-height: 1.75;
-                    max-width: 340px; position: relative; z-index: 1; }
-    .panel-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px;
-                   position: relative; z-index: 1; }
-    .chip { font-size: .78rem; font-weight: 600; padding: 6px 14px; border-radius: 100px;
-            background: rgba(255,255,255,.1); color: rgba(255,255,255,.75);
-            border: 1px solid rgba(255,255,255,.15); }
 
-    /* right panel */
-    .panel-right {
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      padding: 60px 48px; background: #fff;
+    /* ── CARD ── */
+    .card {
+      background: var(--neutral-0);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-md);
+      padding: 48px 44px;
+      width: 100%; max-width: 440px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
-    .form-box { width: 100%; max-width: 400px; }
-    .form-box h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.03em;
-                   margin-bottom: 8px; }
-    .form-box .sub { font-size: .9rem; color: var(--text-muted); margin-bottom: 36px; }
 
-    .form-group { margin-bottom: 18px; }
-    .form-group label { display: block; font-size: .82rem; font-weight: 600;
-                        color: var(--navy); margin-bottom: 7px; }
+    /* ── CARD HEADER ── */
+    .card-brand {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 32px;
+    }
+    .card-brand-icon {
+      width: 36px; height: 36px;
+      background: var(--brand);
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: .9rem; font-weight: 800;
+    }
+    .card-brand-name {
+      font-size: .9rem; font-weight: 700;
+      color: var(--brand);
+    }
+    .card-title {
+      font-size: 1.35rem; font-weight: 800;
+      color: var(--neutral-900);
+      letter-spacing: -.03em;
+      margin-bottom: 6px;
+    }
+    .card-sub {
+      font-size: .84rem; color: var(--neutral-400);
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── FORM ── */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: .78rem; font-weight: 600;
+      color: var(--neutral-700);
+      margin-bottom: 6px;
+    }
     .form-group input {
-      width: 100%; padding: 13px 16px; border: 1.5px solid var(--border);
-      border-radius: var(--radius-sm); font-size: .92rem; font-family: inherit;
-      background: var(--bg); color: var(--text); transition: border-color .2s, box-shadow .2s;
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--neutral-300);
+      border-radius: var(--radius);
+      font-size: .9rem; font-family: var(--font);
+      color: var(--neutral-900);
+      background: var(--neutral-0);
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
     }
+    .form-group input:hover { border-color: var(--neutral-400); }
     .form-group input:focus {
-      outline: none; border-color: var(--coral);
-      box-shadow: 0 0 0 3px rgba(224,91,75,.12);
-      background: #fff;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(21,99,255,.12);
     }
-    .form-options { display: flex; justify-content: space-between; align-items: center;
-                    margin-bottom: 24px; }
-    .remember { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--text-muted); cursor: pointer; }
-    .remember input { width: auto; }
-    .forgot { font-size: .82rem; color: var(--coral); font-weight: 600; }
-    .forgot:hover { color: var(--coral-dark); }
+    .form-group input::placeholder { color: var(--neutral-300); }
 
+    /* ── OPTIONS ── */
+    .form-options {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px;
+    }
+    .remember {
+      display: flex; align-items: center; gap: 7px;
+      font-size: .8rem; color: var(--neutral-400); cursor: pointer;
+    }
+    .remember input[type=checkbox] { accent-color: var(--blue); }
+    .forgot { font-size: .8rem; color: var(--blue); font-weight: 600; }
+    .forgot:hover { color: var(--blue-dark); }
+
+    /* ── SUBMIT ── */
     .btn-submit {
-      width: 100%; padding: 14px; border-radius: var(--radius-sm);
-      background: var(--coral); color: #fff; font-size: 1rem; font-weight: 700;
-      font-family: inherit; cursor: pointer; border: none;
-      box-shadow: 0 2px 10px rgba(224,91,75,.3);
-      transition: all .2s;
+      width: 100%; padding: 11px;
+      background: var(--brand); color: #fff;
+      border: 1px solid var(--brand);
+      border-radius: var(--radius); font-size: .9rem; font-weight: 700;
+      font-family: var(--font); cursor: pointer;
+      transition: all .15s;
     }
-    .btn-submit:hover { background: var(--coral-dark); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(224,91,75,.4); }
+    .btn-submit:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+    .btn-submit:disabled {
+      background: var(--neutral-200); border-color: var(--neutral-200);
+      color: var(--neutral-400); cursor: not-allowed;
+    }
 
-    .divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; }
-    .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
-    .divider span { font-size: .78rem; color: var(--text-muted); }
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 20px 0;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--neutral-200);
+    }
+    .divider span { font-size: .75rem; color: var(--neutral-400); white-space: nowrap; }
 
-    .signup-link { text-align: center; font-size: .88rem; color: var(--text-muted); }
-    .signup-link a { color: var(--coral); font-weight: 700; }
-    .signup-link a:hover { color: var(--coral-dark); }
+    /* ── SIGNUP LINK ── */
+    .signup-link {
+      text-align: center; font-size: .84rem; color: var(--neutral-400);
+    }
+    .signup-link a { color: var(--blue); font-weight: 600; }
+    .signup-link a:hover { color: var(--blue-dark); }
 
+    /* ── NOTICE ── */
+    .notice {
+      margin-top: 20px; padding: 10px 14px;
+      background: var(--neutral-50);
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius);
+      font-size: .76rem; color: var(--neutral-400);
+      line-height: 1.55; text-align: center;
+    }
+
+    /* ── ALERT ── */
     .alert {
-      padding: 12px 16px; border-radius: var(--radius-sm); font-size: .84rem;
-      margin-bottom: 20px; display: none;
+      padding: 10px 14px; border-radius: var(--radius);
+      font-size: .82rem; margin-bottom: 16px;
+      display: none; line-height: 1.5;
     }
-    .alert.error { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
-    .alert.info  { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+    .alert.error {
+      background: var(--error-light);
+      border: 1px solid var(--error-border);
+      color: var(--error);
+    }
 
-    @media (max-width: 768px) {
-      .page { grid-template-columns: 1fr; }
-      .panel-left { display: none; }
-      .panel-right { padding: 40px 24px; }
+    /* ── RESPONSIVE ── */
+    @media (max-width: 480px) {
+      .card { padding: 32px 24px; }
+      main { padding: 24px 16px; }
     }
   </style>
 </head>
 <body>
-<div class="page">
-  <div class="panel-left">
-    <a href="index.html" class="logo">TAXIST<span style="color:var(--coral)">.</span></a>
-    <h2>세무행정 질의에<br><em>AI 답변</em>을<br>즉시 받으세요</h2>
-    <p>법령·판례·조례·내부 자료를 근거로 한 실무 검토 의견을 5분 안에 받아보세요.</p>
-    <div class="panel-chips">
-      <span class="chip">법인세</span>
-      <span class="chip">부가세</span>
-      <span class="chip">조사</span>
-      <span class="chip">징세</span>
-      <span class="chip">재산세</span>
-      <span class="chip">개인세</span>
+
+<header>
+  <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
+  <span class="header-link">계정이 없으신가요? <a href="signup.html">무료 가입하기</a></span>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-brand">
+      <div class="card-brand-icon">T</div>
+      <span class="card-brand-name">TAXIST</span>
+    </div>
+
+    <h1 class="card-title">로그인</h1>
+    <p class="card-sub">아이디와 비밀번호를 입력해 주세요.<br>관리자·일반 회원 구분 없이 동일한 로그인 화면을 사용합니다.</p>
+
+    <div class="alert error" id="alertBox"></div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="email">아이디</label>
+        <input type="text" id="email" name="email"
+               placeholder="아이디를 입력하세요" autocomplete="username" required />
+      </div>
+      <div class="form-group">
+        <label for="password">비밀번호</label>
+        <input type="password" id="password" name="password"
+               placeholder="비밀번호 입력" autocomplete="current-password" required />
+      </div>
+      <div class="form-options">
+        <label class="remember">
+          <input type="checkbox" name="remember" /> 로그인 유지
+        </label>
+        <a href="#" class="forgot">비밀번호 찾기</a>
+      </div>
+      <button type="submit" class="btn-submit" id="submitBtn">로그인</button>
+    </form>
+
+    <div class="divider"><span>또는</span></div>
+
+    <p class="signup-link">
+      아직 계정이 없으신가요? <a href="signup.html">무료로 시작하기 →</a>
+    </p>
+
+    <div class="notice">
+      로그인 후 권한에 따라 자동으로 이동합니다.<br>
+      일반 회원 → 질문 작성 화면 &nbsp;|&nbsp; 관리자 → 관리자 대시보드
     </div>
   </div>
-  <div class="panel-right">
-    <div class="form-box">
-      <h1>다시 오셨군요 👋</h1>
-      <p class="sub">아이디와 비밀번호로 로그인하세요.</p>
-
-      <div class="alert error" id="alertBox">이메일 또는 비밀번호가 올바르지 않습니다.</div>
-      <div class="alert info" id="infoBox"></div>
-
-      <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label for="email">아이디</label>
-          <input type="text" id="email" name="email" placeholder="아이디를 입력하세요" required />
-        </div>
-        <div class="form-group">
-          <label for="password">비밀번호</label>
-          <input type="password" id="password" name="password" placeholder="비밀번호 입력" required />
-        </div>
-        <div class="form-options">
-          <label class="remember">
-            <input type="checkbox" name="remember" /> 로그인 유지
-          </label>
-          <a href="#" class="forgot">비밀번호 찾기</a>
-        </div>
-        <button type="submit" class="btn-submit">로그인</button>
-      </form>
-
-      <p class="signup-link" style="margin-top:20px">
-        아직 계정이 없으신가요? <a href="signup.html">무료로 시작하기</a>
-      </p>
-    </div>
-  </div>
-</div>
+</main>
 
 <script>
-function fillUser(email, pw) {
-  document.getElementById('email').value = email;
-  document.getElementById('password').value = pw;
-}
 async function handleLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('email').value;
+  const email    = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  const btn = e.target.querySelector('button[type=submit]');
+  const btn      = document.getElementById('submitBtn');
+  const alertBox = document.getElementById('alertBox');
+
+  alertBox.style.display = 'none';
   btn.textContent = '로그인 중...';
   btn.disabled = true;
+
   try {
     const res  = await fetch('/api/auth/login', {
       method: 'POST',
@@ -182,15 +277,18 @@ async function handleLogin(e) {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
+
     if (!res.ok) {
-      document.getElementById('alertBox').textContent = data.error || '로그인에 실패했습니다';
-      document.getElementById('alertBox').style.display = 'block';
-      btn.textContent = '로그인'; btn.disabled = false;
+      alertBox.textContent = data.error || '로그인에 실패했습니다.';
+      alertBox.style.display = 'block';
+      btn.textContent = '로그인';
+      btn.disabled = false;
       return;
     }
+
     localStorage.setItem('taxist_token', data.token);
     localStorage.setItem('taxist_user', JSON.stringify(data.user));
-    // 하위 호환용
+
     if (data.user.role === 'admin') {
       localStorage.setItem('adminAuth', 'true');
       localStorage.setItem('adminName', data.user.name);
@@ -200,10 +298,11 @@ async function handleLogin(e) {
       localStorage.setItem('userName', data.user.name);
       window.location.href = 'ask.html';
     }
-  } catch (e) {
-    document.getElementById('alertBox').textContent = '서버 연결에 실패했습니다';
-    document.getElementById('alertBox').style.display = 'block';
-    btn.textContent = '로그인'; btn.disabled = false;
+  } catch {
+    alertBox.textContent = '서버 연결에 실패했습니다.';
+    alertBox.style.display = 'block';
+    btn.textContent = '로그인';
+    btn.disabled = false;
   }
 }
 </script>
