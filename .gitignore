@@ -26,3 +26,9 @@ dist_deploy/
 taxlaw_checkpoint.json
 law_manifest.json
 seed_summary_manifest.json
+
+# 수집 데이터 산출물 / 로그 / 캐시
+.wrangler/
+scripts/*.jsonl
+scripts/*.log
+scripts/*_checkpoint.json
