@@ -19,7 +19,12 @@ async function callGemini(prompt, apiKey) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 8192, temperature: 0.15, topP: 0.85 },
+        generationConfig: {
+          maxOutputTokens: 16384,
+          temperature: 0.15,
+          topP: 0.85,
+          thinkingConfig: { thinkingBudget: 0 },   // 추론 토큰 0 → 출력 전부를 답변에 사용
+        },
         safetySettings: [{ category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }],
       }),
     });
@@ -27,8 +32,12 @@ async function callGemini(prompt, apiKey) {
     // 성공
     if (resp.ok) {
       const data = await resp.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const cand = data.candidates?.[0];
+      const text = cand?.content?.parts?.map(p => p.text).filter(Boolean).join("");
       if (!text) throw new Error("Gemini 응답이 비어있습니다");
+      if (cand?.finishReason === "MAX_TOKENS") {
+        console.warn(`[Gemini] 응답이 출력 토큰 한도(MAX_TOKENS)에 도달해 잘렸을 수 있습니다 (길이 ${text.length}자)`);
+      }
       if (attempt > 0) console.log(`[Gemini] ${attempt}차 재시도에서 성공`);
       return text;
     }
