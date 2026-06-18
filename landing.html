@@ -1,3 +1,13 @@
+<!--
+  TAXIST 마케팅 랜딩페이지 (landing.html)
+  - 세무행정 AI 질의응답 서비스 TAXIST를 소개하고 가입/로그인으로 유도하는 마케팅용 정적 페이지.
+  - 프레임워크 없는 순수 HTML + 인라인 <style>/<script>로 작성된 Cloudflare Pages 정적 페이지.
+  - 구조: <head>의 디자인 토큰·컴포넌트 스타일 →
+    <body>는 NAV(상단 고정) → HERO(메인 카피/CTA) → STRIP(핵심 수치) →
+    FEATURES(기능 소개 6종) → HOW IT WORKS(5단계 프로세스) → CTA(재유도) → FOOTER 순서.
+  - 하단 <script>는 로그인 여부를 확인해 NAV 영역의 가입/로그인 버튼을
+    "OO님 / 질문하기·대시보드로 이동" 버튼으로 동적으로 교체한다.
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -347,6 +357,8 @@
 <body>
 
 <!-- ═══ NAV ═══ -->
+<!-- 비로그인 상태를 가정한 기본 마크업(로그인/가입 버튼). id="navActions"의 innerHTML은
+     하단 <script>에서 로그인 여부를 확인해 사용자 이름·바로가기 버튼으로 통째로 교체될 수 있음 -->
 <nav>
   <div class="nav-inner">
     <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
@@ -358,6 +370,7 @@
 </nav>
 
 <!-- ═══ HERO ═══ -->
+<!-- 첫 화면에서 서비스 가치(법령·판례 기반 AI 답변)를 즉시 전달하고 가입/로그인으로 바로 연결되는 영역 -->
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-badge">
@@ -378,6 +391,7 @@
 </section>
 
 <!-- ═══ STRIP ═══ -->
+<!-- 신뢰도를 강조하기 위한 핵심 수치 4가지 (지원 세목 수, 검토 단계 수, 무료 기간, 출력 형식) — 하드코딩된 정적 값 -->
 <div class="strip">
   <div class="strip-inner">
     <div class="strip-item">
@@ -400,6 +414,8 @@
 </div>
 
 <!-- ═══ FEATURES ═══ -->
+<!-- 실제 백엔드 기능(FTS5 전문검색, 폴더트리 권한 기반 자료 접근, PDF/DOCX 출력 등)을
+     마케팅 문구로 풀어 설명. 카드 6개는 모두 정적 텍스트이며 동적 데이터 연동 없음 -->
 <section class="features">
   <div class="features-inner">
     <div class="section-label">주요 기능</div>
@@ -442,6 +458,8 @@
 </section>
 
 <!-- ═══ HOW IT WORKS ═══ -->
+<!-- 실제 질의 처리 파이프라인(질문 분석 → 법령/판례 조회 → 조례/지침 검토 → 업로드 자료 조회 → 보고서 작성)을
+     사용자에게 신뢰감을 주기 위해 5단계로 시각화. 백엔드 처리 순서와 명칭을 맞춰서 표기해야 정합성이 유지됨 -->
 <section class="how">
   <div class="how-inner">
     <div>
@@ -490,6 +508,7 @@
 </section>
 
 <!-- ═══ CTA ═══ -->
+<!-- 페이지 하단에서 한 번 더 가입을 유도하는 보조 전환 영역. 이미 계정이 있는 사용자를 위한 로그인 링크도 함께 제공 -->
 <section class="cta">
   <div class="cta-inner">
     <h2>지금 바로 무료로 시작하세요</h2>
@@ -502,6 +521,7 @@
 </section>
 
 <!-- ═══ FOOTER ═══ -->
+<!-- 법적 책임 한계 고지(AI 답변은 참고용이며 최종 판단 책임은 담당자)가 핵심. 약관/개인정보처리방침 링크는 현재 placeholder(#) -->
 <footer>
   <div class="footer-inner">
     <div>
@@ -520,8 +540,13 @@
 
 <script>
   /* 로그인 상태 반영 */
+  /* index.html의 로그인 스크립트와 달리 여기서는 즉시 리다이렉트하지 않고
+     NAV의 버튼 영역만 교체한다 — 랜딩페이지는 비로그인 사용자도 그대로 둘러볼 수 있어야 하기 때문.
+     taxist_token 존재 여부는 검사하지 않고 taxist_user만 확인하므로, 토큰이 만료되어도
+     UI상으로는 로그인된 것처럼 보일 수 있음(실제 인증은 이동 후 대상 페이지에서 다시 검증됨) */
   const _user = JSON.parse(localStorage.getItem('taxist_user') || 'null');
   if (_user) {
+    // role에 따라 이동 대상과 버튼 문구를 분기 (관리자 → 대시보드, 일반회원 → 질문하기)
     const dest  = _user.role === 'admin' ? 'admin/dashboard.html' : 'ask.html';
     const label = _user.role === 'admin' ? '대시보드로 이동' : '질문하기';
     document.getElementById('navActions').innerHTML =

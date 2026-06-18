@@ -1,3 +1,29 @@
+<!--
+  admin/questions.html — 관리자용 "질문/답변 관리" 화면
+
+  무엇을 하는 페이지인가:
+    - 회원이 올린 세무 질문과 그에 대한 AI 답변 목록을 한 화면에서 조회/관리한다.
+    - 상단 탭으로 전체/답변완료/처리중/오류 상태별 필터링, 검색창으로 제목·회원명 검색,
+      세목(법인세/부가세 등) 셀렉트로 추가 필터링이 가능하다.
+    - 목록에서 "상세" 버튼을 누르면 하단 상세 패널에 질문 전문/AI 답변을 펼쳐서 보여주고,
+      그 자리에서 재답변 요청(pending으로 되돌리기) 또는 오류 표시(error로 변경) 등
+      상태 전환 액션을 수행할 수 있다.
+    - 별도 빌드 과정 없는 순수 HTML + 인라인 <script>(vanilla JS) 정적 페이지이며,
+      Cloudflare Pages에 그대로 배포된다. 프레임워크나 모듈 시스템 없이 전역 함수로 동작.
+
+  호출하는 백엔드 API (모두 admin/_common.js의 api() 래퍼를 통해 JWT 인증 헤더를 자동 첨부):
+    - GET  /api/admin/questions?page=&category=&status=  : 필터 조건에 맞는 질문 목록 조회
+    - GET  /api/questions/:id                              : 질문 상세 + 해당 답변 1건 조회
+    - PUT  /api/admin/questions { id, status }             : 질문 상태값 변경(재답변 요청/오류 처리)
+
+  전체 구조:
+    - <style> : 사이드바/탑바 공통 레이아웃 + 이 페이지 전용 테이블·탭·상세패널 스타일
+    - <body>  : 좌측 고정 사이드바 + 우측 메인 영역(목록 카드 + 상세 패널)
+    - <script>: _common.js(requireAdmin/api/Q_STATUS_LABEL 등 공용 유틸)를 먼저 로드한 뒤,
+      이 페이지의 상태(allQuestions, activeTab)와 목록 로드/렌더/상세보기/상태변경 함수를 정의.
+      서버에서 받은 전체 목록을 캐싱해두고 검색/필터는 클라이언트에서 즉시 다시 그리는 방식으로,
+      매 키 입력마다 API를 재호출하지 않도록 했다(탭/세목 변경 시에만 서버에 재요청).
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -189,10 +215,20 @@
 
 <script src="_common.js"></script>
 <script>
+// 관리자 권한이 없거나 토큰이 만료된 사용자를 즉시 로그인 페이지로 돌려보내는 1차 방어선.
+// (최종 인가는 어차피 서버 API가 매 요청마다 다시 검사하므로, 여긴 화면 진입 차단용)
 requireAdmin();
+// 서버에서 받아온 현재 필터 조건의 질문 목록을 그대로 캐싱해 둔다.
+// 검색어 입력은 매번 서버를 호출하기엔 비용이 크고 지연이 느껴지므로,
+// renderQ()가 이 캐시를 클라이언트에서 필터링해 즉시 다시 그리는 방식으로 처리한다.
 let allQuestions = [];
+// 현재 선택된 상태 탭(all/done/processing/error). 탭 전환 시 서버에 다시 질의해야
+// 하므로 검색어와 달리 별도 상태로 들고 있다가 loadQuestions()의 쿼리 파라미터로 사용한다.
 let activeTab = 'all';
 
+// 현재 탭/세목 필터 조건으로 서버에서 질문 목록을 새로 받아온다.
+// 탭(상태)과 세목은 서버 쪼임이 적은 인덱스 컬럼이라 서버 사이드 필터링을 맡기고,
+// 자유 텍스트 검색만 클라이언트(renderQ)에서 처리해 서버 부담과 쿼리 복잡도를 줄였다.
 async function loadQuestions() {
   const category = document.getElementById('taxFilter').value;
   const status = activeTab !== 'all' ? activeTab : '';
@@ -203,6 +239,9 @@ async function loadQuestions() {
     const { questions } = await api('/api/admin/questions?' + params.toString());
     allQuestions = questions;
   } catch (e) {
+    // 목록 로드 실패 시 alert로 막지 않고 빈 목록으로 조용히 폴백한다.
+    // 화면 진입 시 자동 호출되는 함수라 alert를 띄우면 페이지 로드 자체가 막힌 것처럼
+    // 보일 수 있으므로, 콘솔 로그만 남기고 "결과 없음" 테이블을 보여주는 쪽을 택했다.
     allQuestions = [];
     console.error('질문 로드 실패:', e);
   }
@@ -210,6 +249,10 @@ async function loadQuestions() {
   renderQ();
 }
 
+// 탭 클릭 핸들러. active 클래스는 클릭된 요소(el)에만 다시 부여해
+// 클래스 목록을 매번 querySelectorAll로 순회하며 토글한다 — 탭 개수가 적어
+// 별도 상태-DOM 바인딩 라이브러리 없이 직접 DOM을 조작하는 게 가장 단순하다.
+// 상태 탭은 서버 필터링 대상이므로 전환 즉시 loadQuestions()로 재조회한다.
 function setTab(tab, el) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -217,6 +260,10 @@ function setTab(tab, el) {
   loadQuestions();
 }
 
+// 캐시된 allQuestions를 검색어로 필터링해 테이블을 다시 그린다.
+// 입력마다(oninput) 호출되므로 서버 호출 없이 클라이언트 메모리에서만 처리해 반응성을 확보한다.
+// 상태 뱃지의 라벨/색상은 Q_STATUS_LABEL/Q_STATUS_COLOR(_common.js)로 매핑하는데,
+// 매핑에 없는 미지의 상태값이 와도 깨지지 않도록 ||'blue'/||item.status로 기본값을 둔다.
 function renderQ() {
   const q = document.getElementById('qSearch').value.toLowerCase();
   const filtered = allQuestions.filter(item =>
@@ -235,6 +282,9 @@ function renderQ() {
     </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">결과 없음</td></tr>';
 }
 
+// 목록의 "상세" 버튼 클릭 시 호출. 목록 API와 별도로 /api/questions/:id를 다시 호출하는 이유는
+// 목록 응답에는 질문 전문/답변 본문 같은 무거운 텍스트 필드를 포함하지 않아 트래픽을 줄였기 때문에,
+// 상세를 펼칠 때만 필요한 회원 한 건의 전체 본문을 따로 가져오는 구조다.
 async function openDetail(id) {
   try {
     const { question, answer } = await api(`/api/questions/${id}`);
@@ -245,21 +295,33 @@ async function openDetail(id) {
       <span>상태: <span class="status status-${Q_STATUS_COLOR[question.status]||'blue'}">${Q_STATUS_LABEL[question.status]||question.status}</span></span>`;
     document.getElementById('dpQ').textContent = question.content || '(질문 내용 없음)';
 
+    // AI 답변 생성이 실패한 경우 백엔드가 answer.content에 "[ERROR]" 접두사로 에러 메시지를
+    // 그대로 저장해두므로, 일반 답변과 구분되게 모노스페이스 폰트 + 빨간 배경으로 강조해
+    // 관리자가 실패 원인을 바로 읽을 수 있도록 한다. 정상 답변은 평범한 텍스트로 표시.
     if (question.status === 'error' && answer?.content?.startsWith('[ERROR]')) {
       document.getElementById('dpA').innerHTML =
         `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:12px 14px;font-size:.83rem;color:#DC2626;white-space:pre-wrap;font-family:monospace">${answer.content}</div>`;
     } else {
       document.getElementById('dpA').textContent = answer ? answer.content : '(아직 답변이 없습니다)';
     }
+    // 재답변 요청/오류 표시 버튼은 매 상세보기마다 onclick을 새로 바인딩한다.
+    // 버튼 자체는 DOM에 고정되어 있고 대상 질문 id만 바뀌므로, 클로저로 id를 캡처해
+    // 이벤트 위임이나 data-id 속성 파싱 없이 간단하게 현재 열린 질문에 연결한다.
     document.getElementById('dpRetryBtn').onclick = () => changeQStatus(id, 'pending');
     document.getElementById('dpErrorBtn').onclick = () => changeQStatus(id, 'error');
     document.getElementById('detailPanel').classList.add('open');
     document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
+    // 상세 조회는 사용자가 명시적으로 클릭한 액션의 결과이므로, 목록 로드 실패와 달리
+    // alert로 즉시 실패를 알려 "상세가 안 열리는 이유"를 바로 인지시킨다.
     alert('상세 로드 실패: ' + e.message);
   }
 }
 
+// 상세 패널의 재답변 요청/오류 표시 버튼에서 호출되는 상태 변경 함수.
+// pending으로 되돌리면 백엔드 배치/워커가 다시 집어서 AI 답변을 재생성하도록 트리거하는
+// 용도이고, error로 바꾸면 더 이상 재시도하지 않을 질문임을 명시적으로 표시하는 용도다.
+// 성공 시 상세 패널을 닫고 목록을 새로고침해 변경된 상태/탭 카운트를 즉시 반영한다.
 async function changeQStatus(id, status) {
   try {
     await api('/api/admin/questions', { method: 'PUT', body: JSON.stringify({ id, status }) });
@@ -268,6 +330,8 @@ async function changeQStatus(id, status) {
   } catch (e) { alert('상태 변경 실패: ' + e.message); }
 }
 
+// 상세 패널은 별도 모달이 아니라 페이지 내 같은 자리에 항상 존재하는 DOM이며,
+// open 클래스 토글만으로 보이기/숨기기를 제어한다(렌더링 시점에 새로 만들고 없애지 않음).
 function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
 }

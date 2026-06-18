@@ -2,7 +2,19 @@
  * 국가법령정보 API - 전체 법령 다운로드 & MD 변환
  * Node.js 18+ 내장 fetch 사용 (별도 설치 불필요)
  *
- * 사용법: node scripts/fetch_all.mjs 인증키
+ * 사용법:
+ *   node scripts/fetch_all.mjs 인증키            전체 재수집 (모든 법령/판례를 처음부터 다시 받음)
+ *   node scripts/fetch_all.mjs --update          증분 업데이트 (law_manifest.json과 비교해 변경분만 수집)
+ *   (API 키는 첫 번째 위치 인수 또는 환경변수 LAW_API_KEY로 전달 가능)
+ *
+ * 실행 시점 / 다른 스크립트와의 관계:
+ *   - GitHub Actions 워크플로 .github/workflows/update_laws.yml 가 이 스크립트를 직접 호출하는
+ *     "메인" 수집 스크립트다. 매일 0시(KST, cron 15:00 UTC)에 `--update` 모드로 자동 실행되고,
+ *     workflow_dispatch로 수동 트리거 시 mode=full을 선택하면 인자 없이(API 키는 env로) 전체 재수집 모드로 실행된다.
+ *   - 워크플로는 이 스크립트가 끝난 뒤 법령자료/, 판례자료/, law_manifest.json, update_log.md 변경분을
+ *     자동으로 git commit & push 한다.
+ *   - 국가법령정보센터(law.go.kr) 공식 Open API만 사용하며, taxlaw.nts.go.kr 비공개 AJAX를 다루는
+ *     fetch_all_taxlaw_full.mjs / fetch_incremental.mjs와는 별개의 독립 실행 스크립트다(서로 호출하지 않음).
  */
 
 import fs from "fs";
@@ -21,6 +33,7 @@ const IS_UPDATE = process.argv.includes("--update");
 const _args     = process.argv.slice(2).filter(a => !a.startsWith("--"));
 const API_KEY   = _args[0] || process.env.LAW_API_KEY || "";
 const BASE_URL  = "https://www.law.go.kr/DRF";
+// 요청 간 350ms 대기 — 공식 API라도 짧은 간격으로 연속 호출하면 차단/지연될 수 있어 완충 시간을 둔다.
 const DELAY_MS  = 350;
 
 const OUT_DIR       = path.join(BASE_DIR, "법령자료");
@@ -75,6 +88,7 @@ function getFolder(name) {
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+// 모든 API 호출 사이의 지연(DELAY_MS) 및 재시도 대기에 공통으로 사용
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function fmtDate(raw = "") {
@@ -90,6 +104,9 @@ function mkdirp(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+// law_manifest.json: 법령명 → {mst, 시행일자, 공포일자, folder, last_updated} 매핑.
+// --update 모드에서 "이전에 수집한 시행일자와 동일하면 스킵"하는 변경분 판별 기준이자
+// 인덱스(index.md) 생성에 쓰이는 메타데이터 저장소다. 파일이 없거나 손상되면 빈 객체로 시작(전체 재수집과 동일하게 동작).
 function loadManifest() {
   try { return JSON.parse(fs.readFileSync(MANIFEST_FILE, "utf8")); }
   catch { return {}; }
@@ -116,6 +133,9 @@ function log(msg) {
 }
 
 // ── API 호출 ─────────────────────────────────────────────────
+// 국가법령정보센터 Open API는 JSON 응답을 지원하므로 정규식/HTML 파서 없이 res.json()으로 바로 구조화된
+// 데이터를 받는다(별도 파싱 라이브러리 불필요). 최대 3회 재시도: 일시적 네트워크 오류나 타임아웃을 흡수하기 위함이며,
+// 429(rate limit) 응답은 횟수 소진과 무관하게 10초를 더 기다린 뒤 같은 attempt를 재사용해 계속 시도한다.
 async function apiGet(endpoint, params) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
   url.searchParams.set("OC",   API_KEY);
@@ -124,11 +144,13 @@ async function apiGet(endpoint, params) {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      // 30초 타임아웃: 응답이 없는 요청이 무한정 매달려 전체 수집을 막지 않도록 상한을 둔다.
       const res = await fetch(url.toString(), { signal: AbortSignal.timeout(30000) });
       if (res.status === 429) { log("  Rate limit — 10초 대기..."); await sleep(10000); continue; }
       if (!res.ok) { log(`  HTTP ${res.status}: ${endpoint}`); return null; }
       return await res.json();
     } catch (e) {
+      // 네트워크 오류/타임아웃 등 — 2초 대기 후 재시도. 3회 모두 실패하면 null을 반환해 호출 측에서 해당 항목만 스킵.
       log(`  요청 실패 (${attempt+1}/3): ${e.message}`);
       await sleep(2000);
     }
@@ -137,6 +159,9 @@ async function apiGet(endpoint, params) {
 }
 
 // ── 법령 목록 수집 ───────────────────────────────────────────
+// 검색어(SEARCH_QUERIES) 1건당 페이지네이션으로 전량을 끝까지 순회한다.
+// display=100: API가 허용하는 1회 최대 조회 건수에 맞춘 배치 크기(요청 수를 줄여 DELAY_MS 누적 대기시간을 최소화).
+// 응답이 단일 객체일 때 배열이 아닌 객체로 오는 API 특성 때문에 매번 Array.isArray로 정규화한다.
 async function searchAllLaws(query) {
   const results = [];
   let page = 1;
@@ -164,6 +189,8 @@ function circleNum(n) {
 }
 
 // API 응답값을 안전하게 문자열로 변환 (리스트·딕셔너리 포함)
+// 국가법령정보센터 JSON은 같은 필드가 문맥에 따라 문자열/배열/객체로 들쭉날쭉하게 내려오므로
+// 모든 호출부에서 일관되게 다루기 위해 재귀적으로 문자열화하는 헬퍼를 둔다.
 function str(v) {
   if (v == null) return "";
   if (typeof v === "string") return v.trim();
@@ -172,6 +199,9 @@ function str(v) {
   return String(v).trim();
 }
 
+// 법령 API의 JSON 본문(조문/항/호/목 트리, 부칙)을 사람이 읽기 좋은 마크다운으로 변환.
+// JSON으로 이미 구조화되어 있어 별도 HTML/XML 파서가 필요 없고, 트리를 그대로 순회하며
+// 제목 레벨(##/###)과 항목 기호(circleNum, 호/목 들여쓰기)로 매핑한다.
 function lawToMd(data, meta) {
   const 법령   = data["법령"] || {};
   const 기본   = 법령["기본정보"] || {};
@@ -245,6 +275,9 @@ function lawToMd(data, meta) {
 }
 
 // ── 판례 수집 ────────────────────────────────────────────────
+// 세목(category)별로 여러 키워드(PREC_QUERIES)를 검색하되, 키워드 간 중복 판례가 많으므로
+// "판례정보일련번호" 기준 Set으로 중복을 제거한다. 판례는 법령보다 건수가 많아 카테고리당 200건으로 상한을 두어
+// (display=20 × 최대 10페이지) 전체 수집 시간과 저장 용량을 통제한다.
 async function collectPrec(category, keywords) {
   const all = []; const seen = new Set();
   for (const kw of keywords) {
@@ -343,6 +376,8 @@ async function main() {
   const updated  = [];
 
   // ── 1단계: 법령 목록 수집 ──
+  // 여러 검색어가 동일 법령을 중복으로 찾아낼 수 있으므로 MST(법령일련번호)를 키로 하는 Map에 모아
+  // 자동으로 중복을 제거한다. "현행연혁코드"가 "현행"인 것만 채택해 폐지/개정 이전 버전은 제외한다.
   log("\n[1/3] 법령 목록 수집 중...");
   const allLaws = new Map(); // MST → meta
   for (const query of SEARCH_QUERIES) {
@@ -362,7 +397,9 @@ async function main() {
     const name   = (meta["법령명한글"] || "").trim();
     const 시행일자 = meta["시행일자"] || "";
 
-    // 업데이트 모드: 변경 없으면 스킵
+    // 업데이트 모드(--update): manifest에 저장된 mst·시행일자가 그대로면 내용 변경이 없다고 보고
+    // API 호출/파일쓰기를 건너뛴다. 매일 자동 실행되는 워크플로에서 불필요한 재다운로드를 막아
+    // API 호출량과 실행 시간을 줄이는 핵심 최적화다.
     if (IS_UPDATE) {
       const ex = manifest[name] || {};
       if (ex.mst === mst && ex["시행일자"] === fmtDate(시행일자)) continue;
@@ -374,6 +411,8 @@ async function main() {
     if (!detail) { log(`    본문 조회 실패: ${name}`); continue; }
 
     const md      = lawToMd(detail, meta);
+    // FOLDER_RULES(법령명 정규식 매칭)로 세목 폴더를 자동 분류해 法령자료/세목명/파일명.md 구조로 저장.
+    // safeName으로 OS에서 금지된 파일명 문자를 치환해 저장 실패를 방지한다.
     const folder  = getFolder(name);
     const dir     = path.join(OUT_DIR, folder);
     mkdirp(dir);
@@ -387,11 +426,16 @@ async function main() {
       last_updated: new Date().toISOString().slice(0, 16).replace("T", " "),
     };
     updated.push(`[법령] ${name}`);
+    // 법령 1건마다 manifest를 즉시 저장 — 수백 건 수집 도중 네트워크/타임아웃 등으로 중단돼도
+    // 이미 처리한 항목의 진행 상황을 잃지 않도록 하기 위함(원자적 체크포인트 역할).
     saveManifest(manifest); // 중간 저장
   }
   log(`→ 법령 저장 완료: ${updated.length}건`);
 
   // ── 3단계: 판례 수집 ──
+  // 판례는 법령처럼 "변경 여부"를 정확히 판별할 기준이 없고 검색 비용도 크므로,
+  // --update 모드에서는 마지막 수집일로부터 7일이 지나지 않았으면 통째로 스킵해 매일 실행되는
+  // 워크플로가 매번 판례까지 재수집하지 않도록 빈도를 낮춘다.
   log("\n[3/3] 판례 수집 중...");
   for (const [category, keywords] of Object.entries(PREC_QUERIES)) {
     if (IS_UPDATE) {

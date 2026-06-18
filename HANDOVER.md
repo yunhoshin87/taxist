@@ -1,19 +1,23 @@
 # TAXIST 프로젝트 인수인계서
 
-> 최종 업데이트: 2026-06-03  
-> 작성 기준: 현재 운영 중인 Cloudflare Pages 배포 기준
+> 최종 업데이트: 2026-06-18
+> 작성 기준: 현재 운영 중인 Cloudflare Pages 배포 기준 (이전 버전 HANDOVER.md 내용 중
+> 실제 코드와 어긋난 부분—`dist_deploy/` 빌드 디렉토리, 로그인 코드 줄 번호 등—을
+> 현재 상태에 맞게 갱신함)
 
 ---
 
 ## 1. 서비스 개요
 
-**TAXIST**는 세무공무원 전용 AI 질의응답 웹 서비스다.  
-세무행정 업무 중 발생하는 법령·판례·해석례 관련 질의에 대해  
+**TAXIST**는 세무공무원 전용 AI 질의응답 웹 서비스다.
+세무행정 업무 중 발생하는 법령·판례·해석례 관련 질의에 대해
 국세청 질의회신 형식으로 AI가 검토 의견을 생성한다.
 
 - **대상 사용자**: 세무서·지방자치단체 세무직 공무원
-- **지원 세목**: 법인세·부가세·조사·징세·재산세·개인세 (6개)
-- **이용 정책**: 가입 후 1개월 무료 (질문 5건 한도) → 유료 전환
+- **지원 세목**: 법인세·부가세·조사·징세·재산세·개인세 등
+- **이용 정책**: 가입 후 30일 무료 체험(trial, 질문 5건 한도) → 유료 전환(active)
+  또는 만료(expired). 결제 연동 자체는 미구현이며, 관리자가 회원 상태/체험기간을
+  수동으로 조정하는 방식으로 운영 중.
 
 ---
 
@@ -22,13 +26,19 @@
 | 구분 | 기술 |
 |---|---|
 | 호스팅 | Cloudflare Pages |
-| 백엔드 API | Cloudflare Pages Functions (ES Modules) |
-| 데이터베이스 | Cloudflare D1 (SQLite) + FTS5 전문검색 |
-| AI 엔진 | Google Gemini 2.5 Flash |
-| 인증 | JWT HS256 (Web Crypto API, 7일 만료) |
-| 비밀번호 | PBKDF2 SHA-256 (salt + 100,000회 반복) |
+| 백엔드 API | Cloudflare Pages Functions (ES Modules, Workers 런타임) |
+| 데이터베이스 | Cloudflare D1 (SQLite 호환) + FTS5 전문검색 |
+| AI 엔진 | Google Gemini 2.5 Flash (REST API 직접 호출) |
+| 인증 | JWT HS256 (Web Crypto API로 직접 구현) |
+| 비밀번호 | PBKDF2-SHA256 (salt + 100,000회 반복, Web Crypto API) |
 | 프론트엔드 | 순수 HTML/CSS/JS (프레임워크 없음) |
-| 배포 도구 | Wrangler CLI |
+| 배포 도구 | Wrangler CLI + GitHub Actions |
+
+> Workers 런타임은 Node.js 네이티브 모듈(`crypto`, `jsonwebtoken`, `bcrypt` 등)을
+> 쓸 수 없어서, JWT 서명/검증과 비밀번호 해시를 모두 Web Crypto API로 직접
+> 구현했다 (`functions/_lib/auth.js`). 이는 라이브러리 미숙지가 아니라 플랫폼
+> 제약에 따른 의도적 설계이므로, 추후 일반 Node.js 서버로 마이그레이션하지
+> 않는 한 그대로 유지하면 된다.
 
 ---
 
@@ -36,60 +46,66 @@
 
 ```
 taxist/
-├── index.html              # 첫 화면 (로그인 페이지)
-├── login.html              # 로그인 (index.html과 동일 내용)
-├── signup.html             # 회원가입 (3단계)
-├── ask.html                # 질문 작성 + 답변 (핵심 화면)
-├── mypage.html             # 마이페이지 + 결제 UI
-├── landing.html            # 기존 랜딩 페이지 (백업)
+├── index.html, login.html      # 로그인 (동일 내용)
+├── signup.html                 # 회원가입 (다단계)
+├── ask.html                    # 질문 작성 + 답변 (핵심 화면)
+├── mypage.html                 # 마이페이지(프로필/통계/이용권)
+├── landing.html                # 랜딩 페이지
 ├── favicon.svg
-├── wrangler.toml           # Cloudflare 배포 설정
-├── HANDOVER.md             # 이 문서
+├── wrangler.toml                # Cloudflare Pages/D1 바인딩 설정
+├── schema.sql                   # D1 초기 스키마 + 기본 데이터
+├── HANDOVER.md                  # 이 문서
 │
-├── functions/              # 서버리스 API (Cloudflare Functions)
-│   ├── _middleware.js      # CORS 처리
+├── functions/                   # Cloudflare Pages Functions (서버리스 API)
+│   ├── _middleware.js           # 모든 요청 전처리 (CORS)
 │   └── _lib/
-│       ├── auth.js         # JWT·비밀번호·권한 유틸
-│       ├── docs.js         # 문서 검색 엔진 (FTS5)
-│       └── gemini.js       # Gemini API 호출 + 재시도 로직
+│       ├── auth.js              # JWT·비밀번호 해시·인증 미들웨어
+│       ├── docs.js               # RAG 검색(retrieval) 엔진 — FTS5 + 폴더 가중치 + NTS 온디맨드
+│       └── gemini.js             # Gemini 호출 + 프롬프트 구성(generation) + 재시도 로직
 │   └── api/
-│       ├── auth/
-│       │   ├── login.js    # POST /api/auth/login
-│       │   └── register.js # POST /api/auth/register
-│       ├── questions/
-│       │   ├── index.js    # GET·POST /api/questions
-│       │   └── [id].js     # GET /api/questions/:id
-│       ├── answers/
-│       │   └── [id].js     # GET·PATCH /api/answers/:id
-│       ├── users/
-│       │   └── me.js       # GET·PATCH /api/users/me
-│       ├── stats/
-│       │   └── index.js    # GET /api/stats
+│       ├── auth/login.js, register.js
+│       ├── questions/index.js, [id].js   # 질문 등록(핵심 파이프라인)/조회
+│       ├── answers/[id].js               # 답변 편집(content vs content_edited)
+│       ├── users/me.js                   # 프로필 조회/수정
+│       ├── stats/index.js                # 통계 (마이페이지/관리자 대시보드 공용)
 │       └── admin/
-│           ├── members.js  # 회원 관리
-│           ├── questions.js
-│           └── folders.js  # 자료 폴더 관리
+│           ├── members.js   # 회원 관리 (검색/상태변경/체험기간 연장)
+│           ├── questions.js # 전체 질문/답변 조회 + 상태 강제 변경
+│           └── folders.js   # 자료 폴더/문서 관리 (검색 대상 on/off, 신규 업로드)
 │
-├── admin/                  # 관리자 페이지 HTML
-│   ├── index.html
-│   ├── dashboard.html
-│   ├── members.html
-│   ├── questions.html
-│   └── documents.html
+├── admin/                       # 관리자 페이지 HTML
+│   ├── _common.js, index.html, dashboard.html, members.html,
+│   │   questions.html, documents.html
 │
-├── dist_deploy/            # 배포용 빌드 디렉토리 (wrangler 배포 대상)
-│   └── (루트 파일들의 복사본 + functions/)
+├── scripts/                     # 데이터 수집/시딩 스크립트 (배포 트리거 제외)
+│   ├── fetch_all.mjs, fetch_all_taxlaw_full.mjs, fetch_incremental.mjs
+│   ├── fetch_prec.mjs, fetch_full_content.mjs
+│   ├── fetch_taxlaw_interp.mjs, fetch_taxlaw_resume.mjs
+│   ├── seed_d1.mjs, seed_d1_api.mjs, seed_interp.mjs, seed_prec.mjs, seed_summary.mjs
+│   ├── export_pending.mjs, import_collected.mjs, standalone_collect.mjs
+│   ├── fetch_all.py, requirements.txt
+│   ├── migrate_fts.sql, migrate_summary.sql, check_summary.sql,
+│   │   fix_test_user.sql, update_doc_3102.sql
+│   └── README.md, HANDOFF_수집작업.md
 │
-├── 법령자료/               # 법령 MD 파일 (D1 시딩용)
-├── 법인세자료/             # 세법 전문서적 PDF→MD 변환본
-├── 법령자료/               # 국가법령정보센터 수집 법령
-└── scripts/                # 데이터 수집·시딩 스크립트
-    ├── fetch_all.mjs       # 법령 자동 수집
-    ├── fetch_taxlaw_interp.mjs  # NTS 해석례 수집
-    ├── fetch_prec.mjs      # 판례 수집
-    ├── seed_d1.mjs         # D1 시딩
-    └── migrate_fts.sql     # FTS5 인덱스 마이그레이션
+├── 법령자료/, 판례자료/, 법인세자료/   # 수집된 원본 법령·판례·해석례·전문서적 텍스트(MD)
+│   (이 폴더들은 코드가 아니라 데이터다 — scripts/fetch_*, seed_*를 거쳐
+│    D1 documents 테이블로 적재되고 답변 생성의 근거 자료가 됨. 법령 조문/판례
+│    전문을 그대로 담고 있어 "주석"을 다는 것이 의미가 없으므로 원문 그대로 둠)
+│
+├── law_manifest.json            # 법령별 MST 코드·시행일·최근 수집일 기록
+├── update_log.md                # 법령 업데이트 이력
+└── .github/workflows/
+    ├── deploy.yml                # main push 시 자동 배포 (데이터/scripts 변경은 트리거 제외)
+    └── update_laws.yml           # 법령 자동 업데이트 (스케줄 실행)
 ```
+
+> **`dist_deploy/`는 더 이상 사용하지 않는다.** 과거 버전 문서는 별도 빌드
+> 디렉토리로 복사 후 배포하는 방식을 설명했지만, 현재는
+> `.github/workflows/deploy.yml`이 `wrangler pages deploy .`로 **저장소 루트를
+> 그대로** 배포한다 (Cloudflare Pages Functions 컨벤션상 `functions/` 폴더는
+> 자동으로 라우팅 인식됨). 루트 HTML/admin 파일을 고치면 별도 복사 없이 그대로
+> 배포에 반영된다.
 
 ---
 
@@ -101,305 +117,208 @@ taxist/
 |---|---|
 | 프로젝트명 | `taxist` |
 | Account ID | `143f2323446f7c53f496c331d3f6ebd2` |
-| Pages URL | `*.taxist.pages.dev` |
 | D1 Database | `taxist-db` |
 | Database ID | `f257e814-b8ff-4ba3-a45b-55981035b44a` |
 
-### 배포 명령
+### 배포 절차 (자동)
+
+1. 작업 브랜치에서 개발 → `main`으로 머지 → push
+2. GitHub Actions(`deploy.yml`)가 자동으로 `wrangler pages deploy . --project-name=taxist
+   --branch=main`을 실행해 배포
+3. 단, 다음 경로 변경은 `paths-ignore`에 의해 **배포를 트리거하지 않음**:
+   `법령자료/**`, `판례자료/**`, `법인세자료/**`, `scripts/**`, `update_log.md`,
+   `law_manifest.json` — 데이터만 갱신했을 때 불필요한 재배포를 막기 위함.
+   데이터만 갱신하고 즉시 배포하고 싶다면 코드 파일도 함께 변경하거나
+   `wrangler pages deploy .`를 로컬에서 직접 실행해야 한다.
+
+### 수동 배포 (필요 시)
 
 ```bash
-# 루트 → dist_deploy 파일 동기화
-cp index.html login.html signup.html ask.html mypage.html dist_deploy/
-cp -r functions/ dist_deploy/functions/
-
-# 배포
-npx wrangler pages deploy dist_deploy --project-name taxist
+npx wrangler pages deploy . --project-name=taxist
 ```
 
-> **주의**: `dist_deploy/`가 실제 배포 대상이다. 루트 파일을 수정한 후 반드시 dist_deploy에 복사해야 반영된다.
-
-### 환경 변수 (Cloudflare Dashboard에서 설정)
+### 환경 변수 / 시크릿 (Cloudflare Dashboard 또는 GitHub Secrets에서 설정)
 
 | 변수명 | 설명 |
 |---|---|
-| `GEMINI_API_KEY` | Google AI Studio에서 발급 |
-| `JWT_SECRET` | JWT 서명용 비밀키 (임의 긴 문자열) |
+| `GEMINI_API_KEY` | Google AI Studio에서 발급, Gemini 호출용 |
+| `JWT_SECRET` | JWT 서명용 비밀키 |
+| `CLOUDFLARE_API_TOKEN` | GitHub Actions 배포용 (repo secret) |
 
 ---
 
 ## 5. 데이터베이스 스키마
 
-### users
-```sql
-CREATE TABLE users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  name          TEXT,
-  email         TEXT UNIQUE,
-  password_hash TEXT,
-  org           TEXT,
-  tax_categories TEXT,  -- JSON 배열 ["법인세","부가세"]
-  role          TEXT DEFAULT 'user',  -- user | admin
-  status        TEXT DEFAULT 'trial', -- trial | active | expired | suspended
-  joined_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-  trial_ends_at DATETIME,
-  last_login_at DATETIME
-);
-```
+전체 스키마와 각 컬럼의 의도는 `schema.sql`에 상세 주석으로 정리되어 있다.
+요약:
 
-### questions
-```sql
-CREATE TABLE questions (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id      INTEGER REFERENCES users(id),
-  tax_category TEXT,
-  title        TEXT,
-  content      TEXT,
-  status       TEXT DEFAULT 'pending',  -- pending | processing | done | error
-  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+- **users**: 회원. `email`은 사실상 로그인 아이디(이메일 형식 검증 없음).
+  `status`는 trial/expired/active/suspended. `tax_categories`는 JSON 배열 문자열.
+- **questions**: 회원이 등록한 질의. `status`는 pending/processing/done/error.
+- **answers**: 질문과 1:1. `content`(AI 원본) / `content_edited`(사용자 편집본,
+  마이그레이션으로 추가된 컬럼, NULL이면 미편집) 분리 저장. `sources`는 JSON 배열.
+- **folders**: 세목/업무 단위 자료 폴더 트리. `is_active=0`이면 검색 대상 제외.
+- **documents**: 법령/판례/해석례/업로드 자료 본문. `nts_doc_id`/`is_summary`는
+  마이그레이션으로 추가(NTS 온디맨드 캐싱용). `content`가 FTS5 검색 대상.
+- **documents_fts**: FTS5 가상테이블 (`migrate_fts.sql`로 추가), documents와
+  rowid로 1:1 매칭.
 
-### answers
-```sql
-CREATE TABLE answers (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  question_id     INTEGER REFERENCES questions(id),
-  content         TEXT,         -- AI 원본 답변 (Markdown)
-  content_edited  TEXT,         -- 사용자 편집본 (NULL이면 원본 표시)
-  sources         TEXT DEFAULT '[]',  -- JSON 배열 (참조 문서명)
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at      DATETIME      -- 편집 시 갱신
-);
-```
+> **중요한 운영 함정**: `schema.sql`의 폴더 INSERT 순서가 그대로 폴더 `id`가 되고,
+> `functions/_lib/docs.js`의 `INTERP_FOLDER_MAP`/`PREC_FOLDER_MAP`이 이 id 값을
+> **하드코딩**으로 참조한다. 폴더를 추가/삭제/재정렬하면 이 매핑도 반드시
+> 같이 수정해야 검색이 깨지지 않는다.
 
-### folders / documents
-```sql
-CREATE TABLE folders (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  parent_id       INTEGER,
-  name            TEXT,
-  tax_category    TEXT,
-  is_active       INTEGER DEFAULT 1,
-  permission_scope TEXT
-);
-
-CREATE TABLE documents (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  folder_id    INTEGER REFERENCES folders(id),
-  name         TEXT,
-  content      TEXT,         -- Markdown 내용
-  tax_category TEXT,
-  nts_doc_id   TEXT,         -- NTS 해석례 원본 ID
-  is_summary   INTEGER DEFAULT 0,  -- 1이면 온디맨드 상세조회 필요
-  is_active    INTEGER DEFAULT 1,
-  updated_at   DATETIME
-);
-
--- FTS5 전문검색 인덱스
-CREATE VIRTUAL TABLE documents_fts USING fts5(
-  content, name, content='documents', content_rowid='id'
-);
-```
+> 운영 DB는 `schema.sql`(초기 스키마) 위에 다음이 추가 적용된 상태이므로,
+> `schema.sql`만 보고 전체 스키마를 판단하면 안 된다:
+> - `scripts/migrate_fts.sql` → `documents_fts` 추가
+> - `scripts/migrate_summary.sql` → `documents.nts_doc_id`, `documents.is_summary` 추가
+> - 별도 ALTER TABLE → `answers.content_edited` 추가
 
 ---
 
 ## 6. 계정 정보
 
-### 관리자 계정
+### 관리자 계정 (기본 시드, `schema.sql`)
+
 | 항목 | 값 |
 |---|---|
 | 아이디 | `admin@taxist.kr` |
-| 비밀번호 | `admin1234` (⚠️ 반드시 변경할 것) |
+| 비밀번호 | `admin1234` (최초 1회만 허용, 아래 설명 참고) |
 | 역할 | admin |
 
-> **보안 주의**: `functions/api/auth/login.js` 19번째 줄에 초기 비밀번호가 하드코딩되어 있다. 운영 전 해당 코드 제거 필수.
-
-### 테스트 계정
-| 항목 | 값 |
-|---|---|
-| 이름 | 김민준 |
-| 아이디 | `test@taxist.kr` |
-| 역할 | user |
-| 상태 | active (유료) |
+`schema.sql`에는 `password_hash`가 평문 마커 `"CHANGE_ME"`로 저장돼 있고,
+`functions/api/auth/login.js`가 로그인 시 이 마커를 발견하면 `admin1234`로만
+1회 로그인을 허용하는 특수 분기를 둔다. **운영 환경에서는 로그인 후 가능한
+빨리 비밀번호를 정식 해시로 교체해야 한다** — 다만 현재 비밀번호 변경 UI가
+없으므로, D1을 직접 조회/수정하거나 `register.js`의 해시 로직을 참고해
+새 해시를 만들어 `UPDATE users SET password_hash=... WHERE email='admin@taxist.kr'`
+형태로 직접 갱신해야 한다.
 
 ---
 
-## 7. 핵심 기능 상세
+## 7. 핵심 기능 상세 (RAG 파이프라인)
 
-### 7-1. 문서 검색 파이프라인 (`functions/_lib/docs.js`)
+### 7-1. 전체 흐름 (`functions/api/questions/index.js`)
 
-질문 입력 시 4단계로 관련 문서를 검색한다.
+1. 질문 등록 → `questions` 테이블 저장 (status='processing')
+2. `loadDocuments()` (`functions/_lib/docs.js`)로 관련 자료 검색
+3. `generateAnswer()` (`functions/_lib/gemini.js`)로 Gemini에 프롬프트 전송, 답변 생성
+4. `answers` 테이블에 저장, `questions.status`를 done/error로 갱신 (에러 시
+   에러 메시지를 답변 내용에 기록해 관리자가 확인 가능하게 함)
+5. 가입 후 30일 경과 또는 무료 질문 5건 소진 시 추가 질문 차단 (trial/expired 분기)
+
+### 7-2. 문서 검색 (`functions/_lib/docs.js`)
+
+질문에서 키워드를 추출(불용어 제거 + 빈도 기반, 형태소 분석기 없음)한 후
+다음 순서로 검색:
 
 ```
-1순위: FTS5 전문검색 (키워드 추출 → documents_fts MATCH)
-1.5순위: 해석례 폴더 직접 포함 (세목별 최신 4건)
-1.7순위: 판례 폴더 직접 포함 (세목별 최신 2건)
-2순위: 세목 기반 폴백 (FTS 결과 부족 시)
-+ 온디맨드 NTS 조회 (is_summary=1 문서 → 실시간 상세 취득 후 D1 캐시)
+1순위:   FTS5 전문검색 (documents_fts MATCH)
+1.5순위: 해석례 폴더 가중치 포함 (INTERP_FOLDER_MAP)
+1.7순위: 판례 폴더 가중치 포함 (PREC_FOLDER_MAP)
+2순위:   세목 기반 폴백 검색 (FTS 결과 부족 시, CATEGORY_MAP)
+       ↓ 결과가 요약본(is_summary=1)인 경우
+온디맨드: NTS API로 실시간 상세조회 후 D1에 캐시 (buildFullContent)
 ```
 
-컨텍스트 한도: 문서당 2,400자, 총 24,000자
+컨텍스트 압축: 문서당 최대 2,400자, 전체 최대 24,000자로 잘라 프롬프트에 포함.
 
-### 7-2. AI 답변 생성 (`functions/_lib/gemini.js`)
+### 7-3. AI 답변 생성 (`functions/_lib/gemini.js`)
 
-- 모델: `gemini-2.5-flash` (단일 모델 유지)
-- 503 과부하 시: 5초 간격, 최대 4회 재시도
-- 답변 형식: 질의요지 → 적용법령 → 판례결정례 → 검토의견 → 추가확인사항
-- temperature: 0.15 (낮은 창의성, 높은 일관성)
-- 번호 인용 규칙: 참고 자료에 실제 등장한 사건번호만 인용 (허위 생성 금지)
+- 모델: Gemini 2.5 Flash, REST API 직접 호출
+- 503/429 에러 시 재시도 로직 포함
+- `thinkingConfig.thinkingBudget=0`으로 설정해 "thinking" 토큰 대신 실제
+  출력 토큰을 최대화
+- **판례/결정례 인용 규칙(이번 세션에서 수정)**: 참고 자료에 실제로 등장하는
+  판례·결정례·해석례만 인용하도록 강제. 참고 자료에 없는 사건은 사건번호도
+  내용도 생성하지 않고 해당 섹션을 통째로 생략한다.
+- **날짜 필드 규칙(이번 세션에서 수정)**: 심사청구/심판청구 등 조세심판
+  자료는 API상 "결정일"이 아니라 "등록일"(`ntstDcmRgtDt`)만 수집되어 있으므로,
+  프롬프트가 자료에 실제로 존재하는 필드명을 그대로 쓰도록 수정 (이전에는
+  "결정일"을 요구해 AI가 "(결정일 미확인)"을 생성하는 문제가 있었음).
 
-### 7-3. 이용권 정책
+### 7-4. 답변 편집
 
-| 상태 | 조건 | 질문 가능 여부 |
-|---|---|---|
-| trial | 가입 후 1개월, 5건 미만 | 가능 |
-| trial (한도 초과) | 5건 이상 사용 | 불가 |
-| expired | 1개월 경과 | 불가 |
-| active | 유료 전환 완료 | 무제한 |
-| suspended | 관리자 정지 | 불가 |
+- `content`(AI 원본)와 `content_edited`(사용자 편집본)를 분리 보관 (`answers/[id].js`)
+- 조회 시 편집본이 있으면 편집본을 우선 표시, 원본은 항상 보존
 
-### 7-4. 답변 편집 및 저장
+### 7-5. 통계 (`functions/api/stats/index.js`)
 
-- 답변 생성 직후 편집 모드 자동 활성화
-- 편집 후 1.5초 자동저장 (`PATCH /api/answers/:id`)
-- 편집본(`content_edited`)과 원본(`content`) 분리 저장
-- 이력 불러오기 시 편집본 우선 표시
-
-### 7-5. 다운로드
-
-- **PDF**: `window.print()` + `@media print` CSS (질문 폼 숨김, 답변만 출력)
-- **Word**: HTML → `.doc` Blob 다운로드 (맑은 고딕, A4 레이아웃, Word 호환 XML 헤더)
-
-### 7-6. 세목별 통계 API (`GET /api/stats`)
-
-- 세목별 질문 수·답변 완료율·편집 건수
-- 최근 30일 일별 질문 추이
-- 관리자: 전체 사용자 기준, 일반 회원: 본인 기준
+- 세목별/일별(최근 30일) 질문·답변 집계
+- 관리자는 전체 회원, 일반 회원은 본인 데이터만 (쿼리에 조건부 `WHERE q.user_id=?` 분기)
 
 ---
 
-## 8. 데이터 자산
+## 8. 관리자 기능
 
-### 법령 데이터 (`법령자료/`)
-국가법령정보센터 API로 수집·갱신 (`scripts/fetch_all.mjs`)
-
-| 분류 | 포함 법령 |
-|---|---|
-| 국세기본 | 국세기본법, 국세징수법, 조세범처벌법 (법·령·규칙) |
-| 소득세 | 소득세법 (법·령·규칙) |
-| 법인세 | 법인세법 (법·령·규칙) |
-| 부가세 | 부가가치세법 (법·령·규칙) |
-| 상속증여세 | 상속세 및 증여세법 (법·령·규칙) |
-| 종합부동산세 | 종합부동산세법 (법·령·규칙) |
-| 조세특례 | 조세특례제한법 (법·령·규칙) |
-| 관세 | 관세법 및 관련 법규 |
-| 지방세 | 지방세기본법·지방세법·지방세징수법·지방세특례제한법 |
-| 국제조세 | 국제조세조정에 관한 법률 |
-| 불복절차 | 행정심판법·행정소송법 |
-
-### 세법 전문서적 (`법인세자료/`)
-PDF → MD 변환 후 D1 저장
-
-- 2024 세목별 최신 판례분석
-- 2022 법인세 상담사례집 (3분권)
-- 2024 포인트 법인조정 실무 (개정7판, 3분권)
-- 2025 소득처분 이론과 실무 (개정1판, 2분권)
-- 2023 부가가치세 실무 (개정증보18판, 2분권)
-- 2024 신고대비 법인세 조정과 신고실무 (3분권)
-
-### 해석례·판례
-- NTS 세법해석례: 온디맨드 조회 + D1 캐싱
-- 세목별 판례: 분류 저장 (folders 테이블 폴더 ID 13~17)
+- **회원 관리** (`admin/members.html` + `functions/api/admin/members.js`):
+  검색/상태 필터, 상태 직접 변경, 체험기간 연장(연장 시 만료됐던 계정도
+  다시 trial로 복원).
+- **질문/답변 관리** (`admin/questions.html` + `functions/api/admin/questions.js`):
+  세목/상태 필터 + 페이지네이션, 상태 강제 변경(품질 검토·재답변 표시용).
+- **자료 폴더 관리** (`admin/documents.html` + `functions/api/admin/folders.js`):
+  폴더/문서 트리 조회, 폴더·문서 단위 활성/비활성 토글(폴더를 끄면 하위
+  문서도 함께 비활성화), 새 문서 업로드(엑셀/텍스트, 500,000자로 자름,
+  FTS5 색인 시도 — 실패해도 문서 저장 자체는 성공 처리되고 세목 폴백
+  검색에는 계속 노출됨).
 
 ---
 
-## 9. 법령 업데이트 방법
+## 9. 법령 데이터 수집/업데이트 (`scripts/`)
 
-```bash
-# 법령 최신화 (국가법령정보센터 API)
-node scripts/fetch_all.mjs
+- `fetch_all.mjs`, `fetch_all_taxlaw_full.mjs`: 국가법령정보센터에서 법령 전문 수집
+- `fetch_incremental.mjs`: 최근 N일간 신규 해석례/결정례만 증분 수집 (cron 운영 가능)
+- `fetch_prec.mjs`, `fetch_full_content.mjs`: 판례/상세 본문 수집
+- `fetch_taxlaw_interp.mjs`, `fetch_taxlaw_resume.mjs`: NTS 해석례 수집(이어받기 지원)
+- `seed_d1.mjs`, `seed_d1_api.mjs`, `seed_interp.mjs`, `seed_prec.mjs`, `seed_summary.mjs`:
+  수집한 MD 파일을 D1에 적재 (서로 다른 데이터 유형/적재 방식별로 분리)
+- `export_pending.mjs`, `import_collected.mjs`, `standalone_collect.mjs`: 수집 작업
+  내보내기/가져오기/독립 실행 보조 스크립트
+- `migrate_fts.sql`, `migrate_summary.sql`: 스키마 마이그레이션 (5절 참고)
+- `.github/workflows/update_laws.yml`: 법령 자동 업데이트 스케줄 실행
 
-# D1에 재시딩
-node scripts/seed_d1_api.mjs
+업데이트 후 `law_manifest.json`(법령별 MST 코드·시행일·최근 수집일)과
+`update_log.md`(업데이트 이력)가 갱신된다.
 
-# 업데이트 이력 확인
-cat update_log.md
-```
-
-`law_manifest.json`에 법령별 MST 코드·시행일·최근 수집일이 기록된다.
-
----
-
-## 10. 향후 개발 과제
-
-### 10-1. OCR 첨부파일 처리 (미구현)
-
-**조사 결론**: LLM 없이 전용 엔진 조합 권장
-
-```
-PDF (텍스트형)  → pdfjs-dist 직접 추출 (무료)
-DOCX           → mammoth.js Markdown 변환 (무료)
-XLSX           → SheetJS Markdown 표 변환 (무료)
-스캔 PDF·이미지 → Naver CLOVA OCR (한국어 최강, 1,000건/월 무료)
-HWP / HWPX    → Upstage Document Parse (유일한 실용적 선택)
-```
-
-**핵심 전략**: 먼저 텍스트 레이어 유무를 확인하고, 스캔본만 OCR 호출 → 전체 업로드의 약 70~80%는 무료 처리 가능
-
-**구현 시 추가 필요한 것**:
-- `CLOVA_OCR_SECRET` 환경변수 (Naver Cloud Console 발급)
-- `UPSTAGE_API_KEY` 환경변수
-- `functions/api/upload/index.js` 신규 작성
-- D1 documents 테이블에 업로드 문서 인덱싱
-
-### 10-2. 결제 시스템 연동 (UI 완성, 로직 미구현)
-
-- 마이페이지 결제 모달 UI는 완성 상태
-- PG사 연동 필요 (토스페이먼츠 권장)
-- `submitPayment()` 함수 교체만으로 연동 가능
-
-### 10-3. 보안 조치 (운영 전 필수)
-
-- [ ] `login.js` 19번째 줄 하드코딩 초기 비밀번호 코드 제거
-- [ ] CORS `*` → 운영 도메인으로 제한 (`_middleware.js`)
-- [ ] 관리자 비밀번호 변경
-
-### 10-4. 추가 개발 예정
-
-- 기관 단위 계정 관리
-- 관리자 세목별 대시보드 (stats API 연동)
-- 알림 기능 (무료기간 만료 예정 알림)
-- 답변 품질 평가 루프
+> 이 스크립트들과 데이터 폴더(법령자료/판례자료/법인세자료) 변경은
+> `deploy.yml`의 `paths-ignore`에 포함되어 있어 **자동 배포를 트리거하지
+> 않는다.** 데이터만 갱신해도 서비스에는 즉시 반영되지만(D1 직접 갱신이므로),
+> 코드 배포 자체는 별도로 일어나지 않는다는 점에 유의.
 
 ---
 
-## 11. 주요 API 엔드포인트
+## 10. 이번 세션에서 수정/작업한 내용
 
-| 메서드 | 경로 | 설명 | 권한 |
-|---|---|---|---|
-| POST | `/api/auth/login` | 로그인 | 공개 |
-| POST | `/api/auth/register` | 회원가입 | 공개 |
-| GET | `/api/questions` | 내 질문 목록 | 로그인 |
-| POST | `/api/questions` | 질문 등록 + AI 답변 | 로그인 |
-| GET | `/api/questions/:id` | 질문 상세 | 본인·관리자 |
-| GET | `/api/answers/:id` | 답변 조회 | 본인·관리자 |
-| PATCH | `/api/answers/:id` | 답변 편집 저장 | 본인·관리자 |
-| GET | `/api/users/me` | 내 프로필 | 로그인 |
-| PATCH | `/api/users/me` | 프로필 수정 | 로그인 |
-| GET | `/api/stats` | 통계 | 로그인 |
-| GET | `/api/admin/members` | 회원 목록 | 관리자 |
-| PUT | `/api/admin/members` | 회원 상태 변경 | 관리자 |
-| GET | `/api/admin/questions` | 전체 질문 관리 | 관리자 |
-| GET | `/api/admin/folders` | 자료 폴더 관리 | 관리자 |
+1. **버그 수정**: AI 답변에서 판례·결정례의 사건번호·날짜가 "(미확인)"으로
+   잘못 표기되던 문제를 `functions/_lib/gemini.js`의 프롬프트 수정으로 해결
+   (7-3절 참고). main 머지 및 GitHub Actions 자동 배포로 적용 완료.
+2. **주석 작업**: 백엔드(`functions/`), 스키마(`schema.sql`), 배포 설정
+   (`wrangler.toml`), 관리자/사용자 프론트엔드(`admin/*.html`, 루트 `*.html`),
+   데이터 수집 스크립트(`scripts/*`)에 핵심 동작 원리와 설계 의도를 설명하는
+   한국어 주석을 추가 (기존 로직/마크업/문법은 변경하지 않음).
+3. 법령자료/판례자료/법인세자료 등 원본 데이터 폴더는 법령 조문·판례 전문
+   자체이므로 별도 주석을 달지 않고 원문 그대로 보존했다 (3절 참고).
+
+---
+
+## 11. 알려진 미해결 과제 (이전 버전 문서 기준, 현재도 유효)
+
+- **결제 시스템 미연동**: 마이페이지 결제 UI는 있으나 PG사 연동 로직은 없음.
+  관리자가 회원 상태(`active`)와 체험기간(`trial_ends_at`)을 수동으로 조정.
+- **비밀번호 변경 UI 없음**: 관리자 기본 비밀번호 교체를 포함해, 회원 비밀번호
+  변경 기능 자체가 아직 없음.
+- **OCR/첨부파일 업로드 미구현**: 질문에 PDF/이미지 등 첨부파일을 첨부해
+  AI가 인식하는 기능은 없음.
+- **CORS**: `functions/_middleware.js`의 CORS 허용 범위를 운영 단계에서
+  필요 범위로 좁히는 것을 검토할 것.
 
 ---
 
 ## 12. 트러블슈팅
 
-### Gemini 503 과부하
-- `gemini-2.5-flash` 글로벌 과부하 현상 (사용량 무관)
-- 현재 설정: 5초 간격, 최대 4회 재시도
-- 지속 시 Google AI Studio 상태 페이지 확인
+### Gemini 503/429 과부하
+- `functions/_lib/gemini.js`에 재시도 로직이 있음 (모델 자체의 글로벌 과부하는
+  재시도로도 해결 안 될 수 있음 — 지속되면 Google AI Studio 상태 확인)
 
 ### wrangler 인증 만료
 ```bash
@@ -411,7 +330,7 @@ npx wrangler login
 npx wrangler d1 execute taxist-db --remote --command "SELECT * FROM users;"
 ```
 
-### 법령 업데이트 로그
+### 법령 업데이트 로그 확인
 ```bash
 cat update_log.md
 ```

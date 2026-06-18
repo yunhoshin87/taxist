@@ -1,3 +1,13 @@
+<!--
+  admin/index.html — 관리자 로그인 페이지
+  ============================================================================
+  TAXIST 관리자페이지의 진입점. 일반 회원 로그인과 별도의 화면이지만 백엔드는
+  동일한 /api/auth/login 엔드포인트를 공유하며, 응답으로 받은 사용자 정보의
+  role이 'admin'인지를 프론트에서 추가로 확인해 관리자 전용 접근을 제한한다.
+  (실제 권한 검증은 각 /api/admin/* 엔드포인트가 JWT의 role을 다시 검사하므로,
+  여기서의 role 체크는 잘못된 화면 진입을 막는 UX 차원의 가드일 뿐이다.)
+  로그인 성공 시 JWT를 localStorage에 저장하고 dashboard.html로 이동한다.
+  -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -72,12 +82,16 @@
 </div>
 
 <script>
+// 로그인 폼 submit 핸들러. 일반 회원과 동일한 /api/auth/login을 호출하는 이유는
+// 백엔드에 관리자 전용 로그인 엔드포인트를 따로 두지 않고, 응답으로 내려온
+// user.role 값으로 관리자 여부만 프론트에서 한 번 더 걸러내는 구조이기 때문이다.
 async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('email').value;
   const pw = document.getElementById('pw').value;
   const btn = document.getElementById('loginBtn');
   const alertBox = document.getElementById('alertBox');
+  // 버튼을 즉시 비활성화해 중복 클릭으로 로그인 요청이 여러 번 나가는 것을 막는다.
   btn.textContent = '로그인 중...'; btn.disabled = true;
   alertBox.style.display = 'none';
   try {
@@ -93,12 +107,16 @@ async function handleLogin(e) {
       btn.textContent = '로그인'; btn.disabled = false;
       return;
     }
+    // 이메일/비밀번호는 맞지만 일반 회원 계정인 경우. 자격증명 자체는 유효하므로
+    // 401이 아니라 200으로 내려오기 때문에, role을 프론트에서 별도로 검사해야 한다.
     if (data.user?.role !== 'admin') {
       alertBox.textContent = '관리자 계정이 아닙니다.';
       alertBox.style.display = 'block';
       btn.textContent = '로그인'; btn.disabled = false;
       return;
     }
+    // 로그인 성공 — 이후 모든 관리자 페이지(_common.js의 api())가 이 토큰을
+    // Authorization 헤더로 사용하므로 localStorage에 저장해 페이지 이동 후에도 유지한다.
     localStorage.setItem('taxist_token', data.token);
     localStorage.setItem('taxist_user', JSON.stringify(data.user));
     localStorage.setItem('adminName', data.user.name);
@@ -109,6 +127,11 @@ async function handleLogin(e) {
     btn.textContent = '로그인'; btn.disabled = false;
   }
 }
+// 페이지 로드 즉시 실행되는 IIFE: 이미 유효한 관리자 토큰을 가진 상태로
+// 로그인 페이지에 다시 들어온 경우(뒤로가기 등) 로그인 폼을 보여줄 필요 없이
+// 곧장 대시보드로 보내준다. _common.js의 _decodeJWT/requireAdmin과 동일한 디코딩
+// 로직을 사용하지만, 이 시점에는 아직 _common.js가 로드되지 않은 페이지이므로
+// (로그인 페이지에는 _common.js를 포함하지 않음) 이 안에 직접 인라인되어 있다.
 (function() {
   const token = localStorage.getItem('taxist_token');
   if (!token) return;

@@ -1,3 +1,8 @@
+// /api/answers/:id — 답변 단건 조회(GET) 및 사용자 편집 내용 저장(PATCH)
+//
+// "편집"은 사용자가 AI 답변을 보고서 작성 전에 직접 다듬을 수 있게 하는
+// 기능으로, 원본(content)은 그대로 보존하고 편집본을 content_edited 컬럼에
+// 별도 저장한다 — AI가 처음에 무엇을 생성했는지 항상 추적 가능하게 하기 위함.
 import { getUser, requireAuth, json } from "../../_lib/auth.js";
 
 export async function onRequest(context) {
@@ -31,7 +36,7 @@ async function handleGet({ env, user, params }) {
   });
 }
 
-// PATCH /api/answers/:id  — 편집 내용 저장
+// PATCH /api/answers/:id  — 편집 내용 저장 (원본 content는 변경하지 않음)
 async function handlePatch({ request, env, user, params }) {
   const answer = await env.DB.prepare(
     "SELECT a.id, q.user_id FROM answers a JOIN questions q ON a.question_id = q.id WHERE a.id = ?"

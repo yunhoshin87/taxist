@@ -1,3 +1,24 @@
+<!--
+  admin/dashboard.html — TAXIST 관리자 메인 대시보드 (세목별 대시보드)
+
+  순수 HTML + 인라인 <script> 정적 페이지(프레임워크 없음, Cloudflare Pages 배포).
+  로그인된 관리자가 가장 먼저 보는 화면으로, 회원/질문 현황을 한눈에 요약해 보여준다.
+
+  호출하는 API (모두 admin/_common.js의 api() 래퍼로 호출, JWT 인증 필요):
+    - GET /api/admin/members   : 전체 회원 목록 (상태, 무료기간 만료일, 세목, 질문수 등)
+    - GET /api/admin/questions : 전체 질문 목록 (세목, 상태, 작성자, 제목 등)
+  별도의 "대시보드 전용" 집계 API는 없고, 두 목록 API의 원본 데이터를 프론트에서
+  직접 집계(필터/카운트/정렬)해서 통계 카드·차트·테이블로 가공해 그린다.
+
+  화면 구성:
+    1) 상단 통계 카드 4개 (전체 회원 / 이용중 / 만료·정지 / 총 질문 + 답변완료율)
+    2) 세목별 질문 현황 막대 그래프
+    3) 무료기간 만료 예정 회원 리스트 (14일 이내)
+    4) 최근 질문 5건 테이블
+    5) 회원 현황 6건 테이블
+  상태값 한글 라벨/색상 매핑(STATUS_*, Q_STATUS_*)과 인증 가드(requireAdmin),
+  로그아웃(logout)은 admin/_common.js의 공통 함수를 그대로 사용한다.
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -211,24 +232,37 @@
 
 <script src="_common.js"></script>
 <script>
+// 페이지 로드 즉시 인증/권한 확인 — 토큰이 없거나 admin이 아니면 즉시 리다이렉트되므로
+// 이 줄 아래의 코드는 "이미 관리자로 인증됨"을 전제로 작성한다.
 requireAdmin();
+// adminName은 로그인 시 저장해둔 값을 재사용(매번 서버에 묻지 않음). 값이 없을 때를 대비해 기본값을 둔다.
 document.getElementById('adminName').textContent = localStorage.getItem('adminName') || '관리자';
 document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 
+// 세목별 막대 그래프 색상. 디자인 고정 값이라 API 응답에는 없고 프론트에 하드코딩한다.
 const catColors = {'법인세':'#3B5BDB','부가세':'#0CA678','조사':'#F76707','징세':'#E64980','재산세':'#7048E8','개인세':'#1098AD'};
 
+// 대시보드의 모든 위젯은 결국 회원/질문 두 목록 데이터를 다른 방식으로 잘라본 것이므로,
+// 별도 집계 API 없이 두 API를 한 번에 병렬로 받아 이 함수 안에서 전부 가공한다.
 async function loadDashboard() {
+  // 두 호출은 서로 의존성이 없으므로 Promise.all로 동시에 보내 초기 로딩 시간을 줄인다.
   const [{ members }, { questions }] = await Promise.all([
     api('/api/admin/members'),
     api('/api/admin/questions'),
   ]);
 
+  // 회원 상태 코드는 trial(무료사용중)/expired(만료)/suspended(정지)/active(전환완료) 중 하나.
+  // "이용중"은 trial 상태만 해당하고, active(유료 전환된 회원)는 별도 카운트하지 않는다.
   const activeCount   = members.filter(m => m.status === 'trial').length;
   const expiredCount  = members.filter(m => m.status === 'expired').length;
   const suspendedCount = members.filter(m => m.status === 'suspended').length;
   const doneQ = questions.filter(q => q.status === 'done').length;
   const totalQ = questions.length;
 
+  // 통계 카드 4개를 배열로 정의한 뒤 map으로 한 번에 렌더링한다.
+  // innerHTML을 통째로 갈아치우는 이유: 이 위젯은 매번 전체 재계산 결과를 그리므로
+  // 개별 DOM 노드를 추적/갱신하는 것보다 통째로 새로 그리는 게 더 단순하고 안전하다.
+  // "만료/정지"는 expired+suspended를 합산해 "전환이 필요한 회원 수"로 보여준다.
   document.getElementById('statsRow').innerHTML = [
     {label:'전체 회원', val:members.length, sub:'누적 가입자', badge:'', badgeClass:''},
     {label:'이용중', val:activeCount, sub:'무료 사용 중', badge:'활성', badgeClass:'badge-green'},
@@ -242,8 +276,12 @@ async function loadDashboard() {
       ${s.badge ? `<span class="stat-badge ${s.badgeClass}">${s.badge}</span>` : ''}
     </div>`).join('');
 
+  // 막대 그래프용 세목별 질문 수 집계. 6개 세목을 키로 미리 0으로 초기화해두는 이유는
+  // 질문이 0건인 세목도 막대를 비워서라도 항상 표시해야 하기 때문(없는 키는 그래프에서 누락됨).
+  // tax_category가 정의된 6개 세목 외의 값이면(데이터 이상치) 조용히 무시한다.
   const catMap = {'법인세':0,'부가세':0,'조사':0,'징세':0,'재산세':0,'개인세':0};
   questions.forEach(q => { if (catMap[q.tax_category] !== undefined) catMap[q.tax_category]++; });
+  // 막대 길이를 비율(%)로 환산하기 위한 기준값. 모든 세목이 0건이어도 0으로 나누지 않도록 최소 1을 보장한다.
   const maxCat = Math.max(...Object.values(catMap), 1);
   document.getElementById('barList').innerHTML = Object.entries(catMap).map(([k,v]) => `
     <div class="bar-item">
@@ -252,6 +290,10 @@ async function loadDashboard() {
       <div class="bar-count">${v}</div>
     </div>`).join('');
 
+  // 무료기간 만료 예정 회원: 영업/CS 측에서 전환 유도가 필요한 대상을 빠르게 파악하기 위한 위젯이므로
+  // trial 상태이면서 만료일이 설정된 회원만 대상으로 하고, 남은 일수를 직접 계산해 붙인다.
+  // 86400000(ms)으로 나누는 것은 하루 단위 차이를 구하기 위함이며, ceil을 쓰는 이유는
+  // "오늘 만료"처럼 하루가 채 안 남은 경우도 0일이 아니라 최소 1일 이상으로 보여 임박함을 강조하기 위함.
   const today = new Date();
   const expiring = members
     .filter(m => m.status === 'trial' && m.trial_ends_at)
@@ -269,6 +311,10 @@ async function loadDashboard() {
       </div>`).join('')
     : '<p style="font-size:.83rem;color:var(--text-muted);text-align:center;padding:20px 0">만료 예정 회원 없음</p>';
 
+  // 최근 질문 5건만 보여주는 미리보기 테이블 — 전체 목록은 questions.html에서 확인하도록
+  // 일부러 slice(0,5)로 제한해 대시보드를 가볍게 유지한다.
+  // 상태 라벨/색상은 _common.js의 Q_STATUS_LABEL/Q_STATUS_COLOR를 그대로 참조해
+  // 다른 관리자 페이지와 표기를 통일한다(정의되지 않은 상태값이면 기본값 'blue'로 방어).
   document.getElementById('recentQ').innerHTML = `
     <thead><tr><th>회원</th><th>세목</th><th>제목</th><th>상태</th></tr></thead>
     <tbody>${questions.slice(0,5).map(q => `
@@ -279,6 +325,8 @@ async function loadDashboard() {
       <td><span class="status status-${Q_STATUS_COLOR[q.status]||'blue'}">${Q_STATUS_LABEL[q.status]||q.status}</span></td>
     </tr>`).join('')}</tbody>`;
 
+  // 회원 현황 미리보기 테이블도 마찬가지로 6건만 노출(전체는 members.html).
+  // tax_categories는 배열로 내려오므로 화면에는 쉼표로 이어붙인 문자열로 평탄화해서 보여준다.
   document.getElementById('memberTable').innerHTML = `
     <thead><tr><th>이름</th><th>세목</th><th>질문수</th><th>상태</th></tr></thead>
     <tbody>${members.slice(0,6).map(m => `
@@ -290,6 +338,9 @@ async function loadDashboard() {
     </tr>`).join('')}</tbody>`;
 }
 
+// API 호출 실패(네트워크 오류, 인증 만료, 서버 오류 등) 시 화면이 빈 채로 멈추지 않도록
+// 통계 카드 영역에 에러 메시지를 노출한다. 다른 위젯(막대그래프/테이블 등)은 그대로 비워둔 채
+// 두므로 사용자가 "데이터 로드 실패"를 보고 새로고침/재로그인 등을 시도할 수 있게 한다.
 loadDashboard().catch(err => {
   document.getElementById('statsRow').innerHTML =
     `<div style="color:#DC2626;padding:12px;font-size:.85rem">데이터 로드 실패: ${err.message}</div>`;

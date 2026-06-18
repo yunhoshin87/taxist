@@ -1,10 +1,26 @@
+// ============================================================================
+// Gemini 답변 생성 (RAG의 "Generation" 단계)
+//
+// docs.js의 loadDocuments()가 골라온 참고 문서 + 질문을 하나의 프롬프트로
+// 합쳐 Gemini 2.5 Flash에 전달하고, 국세청 질의회신 양식의 마크다운 답변을
+// 받아온다. 프롬프트 내 "[중요 — 판례·결정례 인용 규칙]" 부분은 AI가
+// 참고자료에 없는 판례를 임의로 지어내거나(허위 사건번호) 모호한
+// placeholder("(사건번호 미확인)" 등)를 출력하지 않도록 명시적으로 금지한다.
+// ============================================================================
+
 const MODEL   = "gemini-2.5-flash";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-// 503 과부하 시 재시도 설정
-const MAX_RETRIES  = 4;          // 최대 4회 재시도 (총 5번 시도)
-const RETRY_DELAY  = 5000;       // 재시도 간격 5초
+// 503(서버 과부하)/429(할당량 초과) 시 재시도 설정
+const MAX_RETRIES  = 4;          // 최대 4회 재시도 (최초 시도 포함 총 5번)
+const RETRY_DELAY  = 5000;       // 재시도 간격 5초 (고정 — 지수 백오프 아님)
 
+/**
+ * Gemini generateContent API 호출 (재시도 포함).
+ * @param {string} prompt  전체 프롬프트(시스템 지침 + 참고자료 + 질문 + 답변 템플릿)
+ * @param {string} apiKey  env.GEMINI_API_KEY
+ * @returns {Promise<string>} 생성된 답변 텍스트(마크다운)
+ */
 async function callGemini(prompt, apiKey) {
   const url = `${BASE_URL}/${MODEL}:generateContent?key=${apiKey}`;
 
@@ -21,28 +37,32 @@ async function callGemini(prompt, apiKey) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: 16384,
-          temperature: 0.15,
+          temperature: 0.15,                       // 낮은 값 → 일관되고 보수적인 답변(창의성보다 정확성 우선)
           topP: 0.85,
-          thinkingConfig: { thinkingBudget: 0 },   // 추론 토큰 0 → 출력 전부를 답변에 사용
+          thinkingConfig: { thinkingBudget: 0 },   // 추론 토큰 0 → 16384 토큰 전부를 실제 답변 출력에 사용
         },
+        // BLOCK_NONE: 세무/법률 쟁점(탈세, 처벌 등) 논의가 안전 필터에 의해
+        // 차단되지 않도록 위험 콘텐츠 필터를 완화 (세무행정 업무 특성상 필요)
         safetySettings: [{ category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }],
       }),
     });
 
-    // 성공
+    // 성공: candidates[0]의 모든 parts.text를 이어붙여 최종 답변 텍스트로 사용
     if (resp.ok) {
       const data = await resp.json();
       const cand = data.candidates?.[0];
       const text = cand?.content?.parts?.map(p => p.text).filter(Boolean).join("");
       if (!text) throw new Error("Gemini 응답이 비어있습니다");
       if (cand?.finishReason === "MAX_TOKENS") {
+        // 토큰 한도에 도달해 답변이 중간에 잘렸을 가능성 — 호출 실패는 아니므로
+        // 텍스트는 그대로 반환하되 운영 로그로 남겨 추적 가능하게 한다.
         console.warn(`[Gemini] 응답이 출력 토큰 한도(MAX_TOKENS)에 도달해 잘렸을 수 있습니다 (길이 ${text.length}자)`);
       }
       if (attempt > 0) console.log(`[Gemini] ${attempt}차 재시도에서 성공`);
       return text;
     }
 
-    // 503 과부하 → 재시도
+    // 503 과부하 → 잠시 대기 후 재시도 (모델 단기 과부하는 보통 몇 초 내 해소됨)
     if (resp.status === 503) {
       if (attempt < MAX_RETRIES) {
         console.warn(`[Gemini] 503 과부하 (${attempt + 1}/${MAX_RETRIES + 1}회 시도), ${RETRY_DELAY / 1000}초 후 재시도`);
@@ -51,7 +71,8 @@ async function callGemini(prompt, apiKey) {
       throw new Error("서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.");
     }
 
-    // 429 할당량 초과 → 재시도
+    // 429 할당량 초과 → 재시도 (단, 동일한 API 키의 분당/일일 한도이므로
+    // 재시도해도 계속 429가 나면 한도 자체가 초과된 상태)
     if (resp.status === 429) {
       if (attempt < MAX_RETRIES) {
         console.warn(`[Gemini] 429 할당량 초과, ${RETRY_DELAY / 1000}초 후 재시도`);
@@ -60,17 +81,31 @@ async function callGemini(prompt, apiKey) {
       throw new Error("API 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.");
     }
 
-    // 그 외 에러는 즉시 throw
+    // 그 외(400/401/500 등)는 재시도해도 해결되지 않는 오류이므로 즉시 throw
     const body = await resp.text();
     throw new Error(`Gemini API 오류 (${resp.status}): ${body}`);
   }
 }
 
+/**
+ * 질문 + 참고문서로 답변(국세청 질의회신 양식 마크다운)을 생성한다.
+ * @param {string} question      질문 원문
+ * @param {string} taxCategory   질문 세목
+ * @param {Array<{name:string, content:string}>} documents  loadDocuments()의 반환값
+ * @param {string} apiKey        env.GEMINI_API_KEY
+ * @returns {Promise<{content: string, sources: string[]}>}
+ */
 export async function generateAnswer(question, taxCategory, documents, apiKey) {
+  // 문서마다 [자료 N: 이름] 헤더를 붙여 프롬프트에서 서로 구분되게 한다.
+  // 문서당 8000자로 한 번 더 잘라내는 안전장치(docs.js에서 이미 압축했지만 이중 방어).
   const docText = documents.length
     ? documents.map((d, i) => `[자료 ${i + 1}: ${d.name}]\n${d.content.slice(0, 8000)}`).join("\n\n---\n\n")
     : "※ 현재 활성화된 참고 자료가 없습니다.";
 
+  // ── 프롬프트 본문 ──
+  // 구조: (1) 역할/원칙 지시 → (2) 판례 인용 규칙(허위정보 방지) → (3) 실제
+  // 참고자료/질문 삽입 → (4) 답변 출력 형식(마크다운 템플릿, 모델이 그대로
+  // 채워 넣도록 빈 괄호 placeholder로 구성).
   const prompt = `당신은 세무행정 전문가 AI입니다. 세무공무원의 질의에 대해 국세청 세법해석례 양식(질의회신 형식)으로 회신을 작성합니다.
 
 [작성 원칙]
@@ -161,6 +196,8 @@ ${question}
 
   const text = await callGemini(prompt, apiKey);
 
+  // sources: 답변 생성에 사용된 참고문서 이름 목록 (questions/answers 테이블에
+  // 함께 저장되어, 추후 "이 답변이 어떤 자료를 근거로 했는지" 추적 가능하게 한다)
   const sources = documents.map(d => d.name);
   return { content: text, sources };
 }

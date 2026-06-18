@@ -1,3 +1,12 @@
+// ============================================================================
+// /api/admin/folders — 관리자 자료 폴더/문서 관리 (관리자 전용)
+//
+// 폴더트리 조회/문서내용 조회(GET), 폴더 활성토글(PUT), 문서 활성토글(POST),
+// 새 문서 업로드(PATCH) 4가지 동작을 메서드로 구분해 하나의 엔드포인트에서
+// 처리한다. loadDocuments()(functions/_lib/docs.js)가 답변 생성 시 조회하는
+// documents/folders 테이블을 직접 다루는 곳이라, 여기서 비활성화한 자료는
+// 답변에 더 이상 인용되지 않는다.
+// ============================================================================
 import { getUser, requireAdmin, json } from "../../_lib/auth.js";
 
 export async function onRequest(context) {
@@ -59,7 +68,9 @@ async function handlePut({ request, env }) {
   await env.DB.prepare("UPDATE folders SET is_active = ? WHERE id = ?")
     .bind(is_active ? 1 : 0, id).run();
 
-  // 폴더 비활성화 시 하위 문서도 비활성화
+  // 폴더를 비활성화하면 그 안의 문서를 답변 검색에서 완전히 제외하기 위해
+  // 하위 문서도 함께 is_active=0으로 내린다 (폴더만 꺼도 문서가 여전히
+  // 검색되는 것을 방지)
   if (!is_active) {
     await env.DB.prepare("UPDATE documents SET is_active = 0 WHERE folder_id = ?")
       .bind(id).run();
@@ -84,6 +95,8 @@ async function handlePatch({ request, env }) {
   const { folder_id, name, content, tax_category } = await request.json();
   if (!folder_id || !name || !content) return json({ error: "folder_id, name, content 필요" }, 400);
 
+  // 문서 본문은 500,000자(약 D1 안전 한도)로 잘라 저장한다 — 그 이상은
+  // 컬럼 크기 문제보다 답변 생성 시 어차피 다 쓰지 못하므로 의미가 없음.
   const result = await env.DB.prepare(
     `INSERT INTO documents (folder_id, name, content, tax_category, is_active, updated_at)
      VALUES (?, ?, ?, ?, 1, datetime('now'))`
@@ -91,7 +104,11 @@ async function handlePatch({ request, env }) {
 
   const docId = result.meta.last_row_id;
 
-  // FTS5 인덱스 등록 (실패해도 문서 저장은 유지)
+  // documents 테이블에 넣은 rowid(docId)를 그대로 FTS5 가상테이블의 rowid로
+  // 사용해 1:1 매칭시킨다 (loadDocuments의 FTS5 검색이 이 매핑에 의존).
+  // FTS5 테이블 스키마가 (name, content) 컬럼을 가진 버전과, content
+  // 단일 컬럼만 가진 구버전 마이그레이션이 혼재할 수 있어 1차 시도가
+  // 실패하면 콜백 형태로 재시도한다.
   try {
     await env.DB.prepare(
       `INSERT INTO documents_fts(rowid, name, content) VALUES (?, ?, ?)`
@@ -102,6 +119,8 @@ async function handlePatch({ request, env }) {
         `INSERT INTO documents_fts(rowid, content) VALUES (?, ?)`
       ).bind(docId, (name + ' ' + content).slice(0, 500000)).run();
     } catch (e2) {
+      // FTS 색인이 실패해도 문서 자체는 이미 저장됐으므로 업로드는 성공 처리.
+      // (이 문서는 FTS 검색에는 안 잡히지만 세목 폴백 검색에는 여전히 노출됨)
       console.error('FTS5 insert failed:', e2?.message);
     }
   }
