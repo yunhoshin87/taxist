@@ -912,11 +912,11 @@
           <div style="font-size:1.6rem;margin-bottom:8px">📂</div>
           <div class="drop-zone-text">
             <strong>클릭</strong>하거나 파일을 끌어다 놓으세요<br>
-            <span style="font-size:.74rem">PDF, HWP, Word, Excel, 이미지 · 파일당 최대 10MB</span>
+            <span style="font-size:.74rem">PDF, 이미지(PNG/JPG) · 파일당 최대 10MB · 업로드 시 OCR로 텍스트만 추출되며 원본 파일은 저장되지 않습니다</span>
           </div>
         </div>
         <input type="file" id="fileInput" multiple
-               accept=".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+               accept=".pdf,.png,.jpg,.jpeg"
                onchange="onFileSelect(this.files)" />
         <div class="file-list" id="fileList"></div>
       </div>
@@ -1177,7 +1177,8 @@ function onEditorInput() {
 }
 function checkReady() {
   const hasContent = (document.getElementById('editor').innerText || '').trim().length > 10;
-  document.getElementById('submitBtn').disabled = !hasContent;
+  const ocrPending = attachedFiles.some(f => f.status === 'processing');
+  document.getElementById('submitBtn').disabled = !hasContent || ocrPending;
 }
 let _draftTimer;
 function saveDraft() {
@@ -1231,16 +1232,43 @@ function onDrop(e) {
   e.preventDefault(); document.getElementById('dropZone').classList.remove('drag-over');
   onFileSelect(e.dataTransfer.files);
 }
+// 첨부파일은 화면에 목록으로만 보이고, 실제 텍스트는 /api/ocr 호출로 받아온
+// 마크다운으로 보관한다(attachedFiles[i].markdown). 원본 File 객체는 OCR 요청을
+// 보내는 데만 쓰이고 서버로도, 클라이언트 상태로도 별도 저장하지 않는다.
 function onFileSelect(files) {
   const MAX = 10 * 1024 * 1024;
   Array.from(files).forEach(f => {
     if (f.size > MAX) { alert(`${f.name}\n파일 크기가 10MB를 초과합니다.`); return; }
-    if (!attachedFiles.some(x => x.name === f.name)) attachedFiles.push(f);
+    if (attachedFiles.some(x => x.name === f.name)) return;
+    const entry = { name: f.name, size: f.size, status: 'processing', markdown: '', error: '' };
+    attachedFiles.push(entry);
+    uploadAndOcr(f, entry);
   });
   renderFileList();
+  checkReady();
   document.getElementById('fileInput').value = '';
 }
-function removeFile(name) { attachedFiles = attachedFiles.filter(f => f.name !== name); renderFileList(); }
+async function uploadAndOcr(file, entry) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res  = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${_token}` },
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'OCR 처리 실패');
+    entry.status   = 'done';
+    entry.markdown = data.markdown || '';
+  } catch (e) {
+    entry.status = 'error';
+    entry.error  = e.message;
+  }
+  renderFileList();
+  checkReady();
+}
+function removeFile(name) { attachedFiles = attachedFiles.filter(f => f.name !== name); renderFileList(); checkReady(); }
 function renderFileList() {
   const el = document.getElementById('fileList');
   if (!attachedFiles.length) { el.innerHTML = ''; return; }
@@ -1248,16 +1276,13 @@ function renderFileList() {
     <div class="file-item">
       <span>${fileIcon(f.name)}</span>
       <span class="file-name">${f.name}</span>
-      <span class="file-size">${fmtSize(f.size)}</span>
+      <span class="file-size">${f.status === 'processing' ? 'OCR 처리 중...' : f.status === 'error' ? '⚠ ' + f.error : fmtSize(f.size)}</span>
       <button class="file-remove" onclick="removeFile('${f.name.replace(/'/g,"\\'")}')">✕</button>
     </div>`).join('');
 }
 function fileIcon(name) {
   const ext = name.split('.').pop().toLowerCase();
   if (ext === 'pdf') return '📄';
-  if (['hwp','hwpx'].includes(ext)) return '📝';
-  if (['doc','docx'].includes(ext)) return '📃';
-  if (['xls','xlsx'].includes(ext)) return '📊';
   if (['png','jpg','jpeg'].includes(ext)) return '🖼️';
   return '📎';
 }
@@ -1282,8 +1307,14 @@ function buildContext() {
   if (currentType === '간단') {
     return `[질문유형: 간단 질의 | 세목: ${tax}]\n\n`;
   }
-  const files = attachedFiles.map(f => f.name).join(', ') || '없음';
-  return `[질문유형: 일반 | 세목: ${tax}${files !== '없음' ? ' | 첨부: ' + files : ''}]\n\n`;
+  const done  = attachedFiles.filter(f => f.status === 'done');
+  const files = done.map(f => f.name).join(', ') || '없음';
+  let ctx = `[질문유형: 일반 | 세목: ${tax}${files !== '없음' ? ' | 첨부: ' + files : ''}]\n\n`;
+  // 첨부파일 OCR 결과(마크다운)를 질문 본문에 그대로 합쳐 Gemini가 함께 읽도록 한다.
+  for (const f of done) {
+    if (f.markdown.trim()) ctx += `[첨부파일: ${f.name}]\n${f.markdown.trim()}\n\n`;
+  }
+  return ctx;
 }
 
 /* ── 이력 ──
