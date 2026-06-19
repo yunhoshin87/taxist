@@ -147,6 +147,29 @@ function inlineFmt(s) {
       `<a class="law-link" href="https://www.law.go.kr/법령/${encodeURIComponent(n)}" target="_blank" rel="noopener">「${esc(n)}」</a>`
     );
 }
+function linkifyLaws(html) {
+  const linkStyle = 'color:var(--primary);text-decoration:none;border-bottom:1px solid var(--primary-light)';
+
+  // 「법령명」 뒤에 "제N조(의M)?"가 바로 이어지면 해당 조문 페이지로, 없으면 법령 본문으로 링크
+  html = html.replace(/「([^」]+)」(\s*제\s*\d+\s*조(?:의\s*\d+)?)?/g, (_, name, art) => {
+    let url = `https://www.law.go.kr/법령/${encodeURIComponent(name)}`;
+    let label = `「${name}」`;
+    if (art) {
+      url += `/${encodeURIComponent(art.replace(/\s+/g, ''))}`;
+      label += art;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" style="${linkStyle}">${label}</a>`;
+  });
+
+  // 법원 판례 사건번호(예: 2020두12345) → law.go.kr 판례 검색으로 링크.
+  // 서면질의/조심결정 등 문서번호는 고유 ID 없이는 정확한 딥링크가 불가능해 대상에서 제외.
+  html = html.replace(/\b(19|20)\d{2}[가-힣]{1,2}\d{2,6}\b/g, (caseNo) => {
+    const url = `https://www.law.go.kr/precSc.do?query=${encodeURIComponent(caseNo)}`;
+    return `<a href="${url}" target="_blank" rel="noopener" style="${linkStyle}">${caseNo}</a>`;
+  });
+
+  return html;
+}
 function renderReport(md) {
   const lines = md.split('\n'); let html = '', i = 0;
   while (i < lines.length) {
@@ -233,7 +256,7 @@ function renderSectionBody(text) {
     const body   = parts[0];
     const note   = parts[1] ? '※' + parts[1].trim() : '';
     document.getElementById('ansBody').innerHTML =
-      renderReport(body) +
+      linkifyLaws(renderReport(body)) +
       (note
         ? `<div class="warning-box">⚠️ ${note}</div>`
         : `<div class="warning-box">⚠️ 본 보고서는 AI가 등록된 참고자료에 근거하여 생성한 참고용 검토 의견입니다.</div>`);
