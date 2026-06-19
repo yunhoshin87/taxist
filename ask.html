@@ -2026,10 +2026,27 @@ function renderQuickAnswer(text) {
    XSS 방지: href는 encodeURIComponent로 처리. 이미 inlineFmt로 이스케이프된
    HTML 문자열에 적용하므로 '&amp;', '&lt;' 등이 법령명에 포함될 수 없어 안전. */
 function linkifyLaws(html) {
-  return html.replace(/「([^」]+)」/g, (_, name) => {
-    const url = `https://www.law.go.kr/법령/${encodeURIComponent(name)}`;
-    return `「<a href="${url}" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;border-bottom:1px solid var(--primary-light)">${name}</a>」`;
+  const linkStyle = 'color:var(--primary);text-decoration:none;border-bottom:1px solid var(--primary-light)';
+
+  // 「법령명」 뒤에 "제N조(의M)?"가 바로 이어지면 해당 조문 페이지로, 없으면 법령 본문으로 링크
+  html = html.replace(/「([^」]+)」(\s*제\s*\d+\s*조(?:의\s*\d+)?)?/g, (_, name, art) => {
+    let url = `https://www.law.go.kr/법령/${encodeURIComponent(name)}`;
+    let label = `「${name}」`;
+    if (art) {
+      url += `/${encodeURIComponent(art.replace(/\s+/g, ''))}`;
+      label += art;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" style="${linkStyle}">${label}</a>`;
   });
+
+  // 법원 판례 사건번호(예: 2020두12345) → law.go.kr 판례 검색으로 링크.
+  // 서면질의/조심결정 등 문서번호는 고유 ID 없이는 정확한 딥링크가 불가능해 대상에서 제외.
+  html = html.replace(/\b(19|20)\d{2}[가-힣]{1,2}\d{2,6}\b/g, (caseNo) => {
+    const url = `https://www.law.go.kr/precSc.do?query=${encodeURIComponent(caseNo)}`;
+    return `<a href="${url}" target="_blank" rel="noopener" style="${linkStyle}">${caseNo}</a>`;
+  });
+
+  return html;
 }
 
 /* ── 보고서 공유 ──────────────────────────────────────────────────────────────
