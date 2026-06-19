@@ -68,24 +68,49 @@ async function handlePut({ request, env }) {
   await env.DB.prepare("UPDATE folders SET is_active = ? WHERE id = ?")
     .bind(is_active ? 1 : 0, id).run();
 
-  // 폴더를 비활성화하면 그 안의 문서를 답변 검색에서 완전히 제외하기 위해
-  // 하위 문서도 함께 is_active=0으로 내린다 (폴더만 꺼도 문서가 여전히
-  // 검색되는 것을 방지)
   if (!is_active) {
+    // 폴더 비활성화: 하위 문서도 모두 is_active=0 + FTS5 인덱스에서 제거
+    const { results: docs } = await env.DB.prepare(
+      "SELECT id FROM documents WHERE folder_id = ?"
+    ).bind(id).all();
+
     await env.DB.prepare("UPDATE documents SET is_active = 0 WHERE folder_id = ?")
       .bind(id).run();
+
+    for (const doc of docs) {
+      await env.DB.prepare("DELETE FROM documents_fts WHERE rowid = ?")
+        .bind(doc.id).run().catch(() => {});
+    }
   }
 
   return json({ ok: true });
 }
 
-// POST /api/admin/folders - 문서 활성/비활성 토글
+// POST /api/admin/folders - 문서 활성/비활성 토글 (FTS5 동기화 포함)
 async function handlePost({ request, env }) {
   const { doc_id, is_active } = await request.json();
   if (!doc_id) return json({ error: "doc_id 필요" }, 400);
 
   await env.DB.prepare("UPDATE documents SET is_active = ? WHERE id = ?")
     .bind(is_active ? 1 : 0, doc_id).run();
+
+  if (!is_active) {
+    // 비활성화: FTS5에서 제거 (비활성 문서가 검색에 잡히지 않도록)
+    await env.DB.prepare("DELETE FROM documents_fts WHERE rowid = ?")
+      .bind(doc_id).run().catch(() => {});
+  } else {
+    // 재활성화: FTS5에 다시 추가
+    const doc = await env.DB.prepare(
+      "SELECT name, content FROM documents WHERE id = ?"
+    ).bind(doc_id).first();
+    if (doc?.content) {
+      const ftsContent = (doc.name + ' ' + doc.content).slice(0, 500000);
+      await env.DB.prepare("DELETE FROM documents_fts WHERE rowid = ?")
+        .bind(doc_id).run().catch(() => {});
+      await env.DB.prepare("INSERT INTO documents_fts(rowid, content) VALUES (?, ?)")
+        .bind(doc_id, ftsContent).run().catch(() => {});
+    }
+  }
 
   return json({ ok: true });
 }
@@ -104,26 +129,14 @@ async function handlePatch({ request, env }) {
 
   const docId = result.meta.last_row_id;
 
-  // documents 테이블에 넣은 rowid(docId)를 그대로 FTS5 가상테이블의 rowid로
-  // 사용해 1:1 매칭시킨다 (loadDocuments의 FTS5 검색이 이 매핑에 의존).
-  // FTS5 테이블 스키마가 (name, content) 컬럼을 가진 버전과, content
-  // 단일 컬럼만 가진 구버전 마이그레이션이 혼재할 수 있어 1차 시도가
-  // 실패하면 콜백 형태로 재시도한다.
-  try {
-    await env.DB.prepare(
-      `INSERT INTO documents_fts(rowid, name, content) VALUES (?, ?, ?)`
-    ).bind(docId, name, content.slice(0, 500000)).run();
-  } catch {
-    try {
-      await env.DB.prepare(
-        `INSERT INTO documents_fts(rowid, content) VALUES (?, ?)`
-      ).bind(docId, (name + ' ' + content).slice(0, 500000)).run();
-    } catch (e2) {
-      // FTS 색인이 실패해도 문서 자체는 이미 저장됐으므로 업로드는 성공 처리.
-      // (이 문서는 FTS 검색에는 안 잡히지만 세목 폴백 검색에는 여전히 노출됨)
-      console.error('FTS5 insert failed:', e2?.message);
-    }
-  }
+  // 문서명을 본문 앞에 붙여 FTS5 검색 시 문서명 키워드도 매칭되게 한다.
+  // content 단일 컬럼만 있는 migrate_fts.sql 스키마 기준으로 일관되게 삽입.
+  const ftsContent = (name + ' ' + content).slice(0, 500000);
+  await env.DB.prepare(
+    `INSERT INTO documents_fts(rowid, content) VALUES (?, ?)`
+  ).bind(docId, ftsContent).run().catch(e => {
+    console.error('FTS5 insert failed:', e?.message);
+  });
 
   return json({ ok: true, id: docId });
 }

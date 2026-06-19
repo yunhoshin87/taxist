@@ -40,12 +40,12 @@ export async function signJWT(payload, secret, expiresIn = 86400 * 7) {
   payload.iat = Math.floor(Date.now() / 1000); // 발급 시각
 
   // JWT 표준 구조: base64url(header) + "." + base64url(payload)
-  const data = `${ENC({ alg: "HS256", typ: "JWT" })}.${ENC(payload)}`;
+  const data = `${ENC({ alg: "HS512", typ: "JWT" })}.${ENC(payload)}`;
 
-  // HMAC-SHA256 서명을 위해 secret을 CryptoKey로 가져온다
+  // HMAC-SHA512 서명
   const key  = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    { name: "HMAC", hash: "SHA-512" }, false, ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
 
@@ -67,7 +67,7 @@ export async function verifyJWT(token, secret) {
 
   const key  = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    { name: "HMAC", hash: "SHA-512" }, false, ["verify"]
   );
   const sigBytes = Uint8Array.from(
     atob(sig.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)
@@ -84,38 +84,57 @@ export async function verifyJWT(token, secret) {
 }
 
 /**
- * 비밀번호 해싱 (PBKDF2-SHA256, 100,000 iterations)
- * salt는 매번 랜덤 생성하여 "salt:hash" 형태의 문자열로 DB에 저장한다.
- * bcrypt 대신 PBKDF2를 쓰는 이유: Web Crypto API(crypto.subtle)가 표준으로
- * 지원하는 알고리즘만 Workers 런타임에서 사용 가능하기 때문.
+ * 비밀번호 해싱 (PBKDF2-SHA512, 100,000 iterations)
+ * 저장 형식: "$sha512$<saltB64>:<hashB64>"
+ * 접두어($sha512$)로 알고리즘 버전을 식별해, 향후 마이그레이션 시 구버전(SHA-256)과
+ * 구분할 수 있게 한다. 구버전은 "$sha512$" 접두어가 없는 "saltB64:hashB64" 형식.
  */
 export async function hashPassword(password) {
-  const salt = crypto.getRandomValues(new Uint8Array(16)); // 16바이트 랜덤 salt
+  const salt = crypto.getRandomValues(new Uint8Array(16));
   const key  = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-512" }, key, 512
   );
   const hash    = btoa(String.fromCharCode(...new Uint8Array(bits)));
   const saltB64 = btoa(String.fromCharCode(...salt));
-  return `${saltB64}:${hash}`; // DB의 password_hash 컬럼에 저장되는 형식
+  return `$sha512$${saltB64}:${hash}`;
 }
 
 /**
- * 비밀번호 검증 — 로그인 시 입력한 평문 비밀번호를 저장된 "salt:hash"와 비교한다.
- * 저장된 salt를 재사용해 동일한 PBKDF2 연산을 수행한 뒤 결과 해시가 같은지 확인.
+ * 비밀번호 검증 — 저장된 해시 형식(접두어)을 보고 SHA-512(신규) / SHA-256(구버전)을
+ * 자동 선택해 검증한다. 로그인 성공 후 login.js에서 구버전 해시를 SHA-512로 업그레이드한다.
+ * @returns {{ valid: boolean, isLegacy: boolean }}
+ *   isLegacy=true이면 호출부(login.js)가 DB 해시를 SHA-512로 갱신해야 한다.
  */
 export async function verifyPassword(password, stored) {
-  const [saltB64, hash] = stored.split(":");
-  const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
-  const key  = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256
-  );
-  return btoa(String.fromCharCode(...new Uint8Array(bits))) === hash;
+  if (stored.startsWith("$sha512$")) {
+    // 신규 SHA-512 형식
+    const rest    = stored.slice("$sha512$".length);
+    const [saltB64, hash] = rest.split(":");
+    const salt    = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    const key     = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
+    );
+    const bits    = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-512" }, key, 512
+    );
+    const valid   = btoa(String.fromCharCode(...new Uint8Array(bits))) === hash;
+    return { valid, isLegacy: false };
+  } else {
+    // 구버전 SHA-256 형식 ("saltB64:hashB64") — 로그인 성공 시 자동 업그레이드
+    const [saltB64, hash] = stored.split(":");
+    const salt    = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    const key     = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
+    );
+    const bits    = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256
+    );
+    const valid   = btoa(String.fromCharCode(...new Uint8Array(bits))) === hash;
+    return { valid, isLegacy: true };
+  }
 }
 
 /**

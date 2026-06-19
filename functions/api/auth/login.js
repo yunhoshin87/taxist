@@ -1,5 +1,5 @@
 // POST /api/auth/login — 이메일/비밀번호 로그인 → JWT 발급
-import { verifyPassword, signJWT, json } from "../../_lib/auth.js";
+import { verifyPassword, hashPassword, signJWT, json } from "../../_lib/auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -23,13 +23,21 @@ export async function onRequestPost(context) {
     // (실제 운영 시에는 로그인 후 반드시 비밀번호를 변경해야 함 — 현재는
     //  비밀번호 변경 UI가 별도로 없으므로 DB에서 직접 hashPassword()로 갱신 필요)
     let valid = false;
+    let isLegacy = false;
     if (user.password_hash === "CHANGE_ME" && password === "admin1234") {
       valid = true;
     } else {
-      valid = await verifyPassword(password, user.password_hash);
+      ({ valid, isLegacy } = await verifyPassword(password, user.password_hash));
     }
 
     if (!valid) return json({ error: "이메일 또는 비밀번호가 올바르지 않습니다" }, 401);
+
+    // SHA-256 구버전 해시 → SHA-512 자동 업그레이드 (로그인 성공 시 1회)
+    if (isLegacy) {
+      const newHash = await hashPassword(password);
+      await env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+        .bind(newHash, user.id).run().catch(() => {});
+    }
 
     // 무료기간(trial_ends_at) 만료 여부를 로그인 시점에 확인해 즉시 DB에 반영.
     // (questions/index.js의 트라이얼 체크와 함께, 만료 처리가 누락되지 않도록

@@ -248,56 +248,173 @@ const PREC_FOLDER_MAP = {
   '조사':   [16],
 };
 
+// ── Gemini 기반 쿼리 확장 ──────────────────────────────────────────
+// extractKeywords()의 단순 빈도 기반 추출로는 동의어·상위 개념·약어 등을
+// 잡아낼 수 없어 FTS5 검색 결과가 0건이 되는 경우가 있다.
+// 이때 Gemini에 "이 질문과 관련된 세무 전문 검색어 5개"를 요청해
+// 원래 키워드로는 매칭되지 않던 문서까지 검색 범위를 넓힌다.
+//
+// 예: 질문 "특수관계법인 간 거래에서 부당행위 판단 기준은?" →
+//     extractKeywords가 ['특수관계', '거래', '판단', '기준'] 등을 뽑아도
+//     DB 문서에 "부당행위계산", "법인세법52조" 등의 용어로 저장된 경우
+//     FTS가 0건을 반환 → expandKeywordsWithGemini가 ['부당행위계산', '특수관계인',
+//     '법인세법52조', '고저가양도'] 등을 생성 → 재검색에서 매칭 성공.
+//
+// 비용·지연 최소화를 위해:
+//   - 질문을 400자로 잘라 전달 (긴 질문은 핵심이 앞에 있다)
+//   - maxOutputTokens=60: 키워드 5개 정도면 충분 (토큰 낭비 방지)
+//   - thinkingBudget=0: 추론 없이 즉시 출력
+//   - temperature=0: 항상 동일한 전문용어를 반환 (랜덤성 불필요)
+//
+// 실패(네트워크 오류, API 오류 등) 시 빈 배열을 반환해 호출부가
+// 폴백 처리(세목 매핑 검색)를 이어가도록 한다.
+async function expandKeywordsWithGemini(question, taxCategory, apiKey) {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text:
+`세목: ${taxCategory}
+질문: ${question.slice(0, 400)}
+
+위 질문과 관련된 세무법령·판례·해석례에서 실제로 쓰이는 전문 검색어 5개를 쉼표로 구분해 반환하세요.
+반드시 원형 그대로 반환하세요 (예: 부당행위계산, 특수관계인, 법인세법52조, 고저가양도).
+키워드만 반환하고 다른 설명은 하지 마세요.` }] }],
+        generationConfig: {
+          maxOutputTokens: 60,
+          temperature: 0,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+    // 쉼표·공백·줄바꿈으로 분리하고, 한글/영문/숫자 외 문자를 제거해 정제한다.
+    // 최대 6개만 사용 — 너무 많은 키워드는 FTS OR 조건을 과도하게 넓혀 노이즈가 증가한다.
+    return text
+      .split(/[,，、\s\n]+/)
+      .map(k => k.trim().replace(/[^가-힣a-zA-Z0-9]/g, ''))
+      .filter(k => k.length >= 2)
+      .slice(0, 6);
+  } catch {
+    return []; // 오류 시 빈 배열 → 호출부에서 폴백(2순위 세목 매핑 검색)으로 이어짐
+  }
+}
+
+// ── FTS5 검색 실행 (재사용 가능한 내부 함수) ─────────────────────
+// loadDocuments() 내에서 여러 단계(원래 키워드, 축소 키워드, 확장 키워드)로
+// FTS를 반복 호출하는데, 공통 로직을 이 함수로 분리해 중복을 제거한다.
+//
+// 2단계 쿼리 이유:
+//   FTS5 가상 테이블(documents_fts)은 rank(관련도 점수)와 rowid만 빠르게 반환하지만,
+//   실제 문서 내용(content), 폴더명, is_active 등의 필터는 documents/folders 테이블에
+//   있다. 따라서 FTS로 후보 rowid 목록을 먼저 얻은 뒤, 그 id 목록으로 documents를
+//   JOIN해 완전한 문서 객체를 가져오는 2단계 쿼리가 필요하다.
+//
+// FTS5 rank 컬럼: 값이 작을수록(음수에 가까울수록) 관련도가 높다.
+//   ORDER BY rank은 관련도 내림차순과 동일. 결과를 rankMap으로 유지해
+//   두 번째 쿼리 후에도 관련도 순서를 복원한다.
+async function runFTS(db, keywords) {
+  if (keywords.length < 1) return [];
+  // 각 키워드를 FTS5 안전 인용 형태로 변환 후 OR로 연결
+  // 예: keywords=['법인세', '부당행위'] → '"법인세" OR "부당행위"'
+  const ftsQuery = keywords.map(ftsEscape).join(' OR ');
+  try {
+    // 1단계: FTS5로 관련 문서 rowid + rank 획득 (최대 12건)
+    // LIMIT 12: 너무 많은 후보는 프롬프트 토큰을 낭비하므로 상위 12건으로 제한
+    const { results: ftsRows } = await db.prepare(`
+      SELECT f.rowid AS doc_id, rank
+      FROM documents_fts f
+      WHERE documents_fts MATCH ?
+      ORDER BY rank
+      LIMIT 12
+    `).bind(ftsQuery).all();
+
+    if (!ftsRows.length) return [];
+
+    // 2단계: rowid 목록으로 실제 문서 메타데이터 + 내용 조회
+    // is_active=1 AND f.is_active=1: 비활성화된 문서/폴더는 제외
+    // content IS NOT NULL: 아직 내용이 없는 문서(업로드 중 등)는 제외
+    const ids = ftsRows.map(r => r.doc_id);
+    const { results } = await db.prepare(`
+      SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
+             d.nts_doc_id, d.is_summary
+      FROM documents d
+      JOIN folders f ON d.folder_id = f.id
+      WHERE d.id IN (${ids.map(() => '?').join(',')})
+        AND d.is_active = 1 AND f.is_active = 1 AND d.content IS NOT NULL
+    `).bind(...ids).all();
+
+    // rankMap으로 두 번째 쿼리 결과를 FTS 관련도 순으로 재정렬
+    // (두 번째 SELECT는 IN 조건이라 FTS 순서가 보장되지 않기 때문)
+    const rankMap = Object.fromEntries(ftsRows.map(r => [r.doc_id, r.rank]));
+    return results.sort((a, b) => (rankMap[a.id] || 0) - (rankMap[b.id] || 0));
+  } catch (e) {
+    console.error('FTS search failed:', e?.message);
+    return []; // 검색 오류는 폴백 단계로 넘기기 위해 빈 배열 반환
+  }
+}
+
 /**
  * 질문에 대한 참고 문서 목록을 검색해 반환한다 (Gemini 프롬프트에 그대로 삽입됨).
  *
  * @param {D1Database} db          Cloudflare D1 바인딩 (env.DB)
  * @param {string} taxCategory     회원/질문의 세목 (법인세/부가세/...)
  * @param {string} question        질문 원문 (키워드 추출에 사용, 빈 문자열이면 키워드 검색 생략)
+ * @param {string|null} apiKey     Gemini API 키 (쿼리 확장용, null이면 확장 비활성)
  * @returns {Promise<Array<{id, name, content, ...}>>}  컨텍스트 압축이 끝난 문서 배열
  */
-export async function loadDocuments(db, taxCategory, question = '') {
+export async function loadDocuments(db, taxCategory, question = '', apiKey = null) {
+  // ── 검색 캐스케이드 전체 구조 ──────────────────────────────────────
+  // docs 배열에 문서를 쌓아가는 방식. 앞 단계에서 충분히 찾으면 뒤 단계는 보완만 한다.
+  //
+  // [1단계]   FTS5 직접 검색 (추출 키워드 전체, 최대 8개)
+  // [1.5단계] FTS5 재시도 — 키워드를 상위 3개로 줄여 범위 확장
+  // [1.7단계] Gemini 쿼리 확장 후 FTS5 재시도 — 동의어/전문용어 커버
+  // [1.5순위] 세목별 해석례 폴더 최신 문서 보충 (항상 실행)
+  // [1.7순위] 세목별 판례 폴더 최신 문서 보충 (항상 실행)
+  // [2단계]   세목 매핑 기반 폴백 — docs가 3건 미만일 때만
+  // [3단계]   온디맨드 NTS 상세 조회 — is_summary=1 문서를 전문으로 대체
+  // [4단계]   컨텍스트 압축 — 키워드 관련 단락 추출 + 글자 수 제한
   const keywords = question ? extractKeywords(question) : [];
   let docs = [];
 
-  // ── 1순위: FTS5 전문검색 (키워드가 2개 이상 추출됐을 때만 시도) ──
-  // 키워드가 너무 적으면 OR 검색이 과도하게 광범위해져 의미가 없으므로 스킵.
+  // ── 1단계: FTS5 전문검색 ─────────────────────────────────────────
+  // 키워드가 2개 미만이면 OR 조건이 너무 광범위해 노이즈가 많아지므로 생략.
+  // (질문이 없는 경우 — question='' — 도 여기서 걸러져 폴백으로 넘어간다.)
   if (keywords.length >= 2) {
-    try {
-      const ftsQuery = keywords.map(ftsEscape).join(' OR ');
+    docs = await runFTS(db, keywords);
 
-      // documents_fts는 documents 테이블과 별도로 유지되는 FTS5 가상 테이블
-      // (schema.sql / migrate_fts.sql 참고). rank는 SQLite FTS5의 관련도 점수.
-      const { results: ftsRows } = await db.prepare(`
-        SELECT f.rowid AS doc_id, rank
-        FROM documents_fts f
-        WHERE documents_fts MATCH ?
-        ORDER BY rank
-        LIMIT 12
-      `).bind(ftsQuery).all();
+    // ── 1.5단계: 키워드 수 축소 재시도 (상위 3개만 — 더 넓은 매칭) ──
+    // 8개 키워드를 모두 OR로 묶으면 각 키워드 출현 빈도가 낮아 0건이 될 수 있다.
+    // 핵심 키워드 3개만 남겨 검색 범위를 넓힌다.
+    if (docs.length === 0 && keywords.length > 3) {
+      docs = await runFTS(db, keywords.slice(0, 3));
+    }
 
-      if (ftsRows.length > 0) {
-        const ids = ftsRows.map(r => r.doc_id);
-        const placeholders = ids.map(() => '?').join(',');
-
-        const { results } = await db.prepare(`
-          SELECT d.id, d.name, d.content, d.tax_category, f.name AS folder_name,
-                 d.nts_doc_id, d.is_summary
-          FROM documents d
-          JOIN folders f ON d.folder_id = f.id
-          WHERE d.id IN (${placeholders})
-            AND d.is_active = 1
-            AND f.is_active = 1
-            AND d.content IS NOT NULL
-        `).bind(...ids).all();
-
-        // FTS 검색 결과(rank)순서를 유지하기 위해 재정렬
-        const rankMap = Object.fromEntries(ftsRows.map(r => [r.doc_id, r.rank]));
-        docs = results.sort((a, b) => (rankMap[a.id] || 0) - (rankMap[b.id] || 0));
+    // ── 1.7단계: Gemini 쿼리 확장 재시도 ─────────────────────────────
+    // FTS 결과가 여전히 없고 apiKey가 제공된 경우: Gemini로 관련 전문용어를
+    // 생성해 재검색. 직접 검색어에 없는 동의어·상위 개념 등을 커버한다.
+    // apiKey가 null인 경우(관리자 페이지 등 일부 경로)는 이 단계를 건너뛴다.
+    if (docs.length === 0 && apiKey) {
+      try {
+        const expanded = await expandKeywordsWithGemini(question, taxCategory, apiKey);
+        if (expanded.length >= 2) {
+          // 원래 키워드 상위 4개 + Gemini 확장 키워드를 합쳐 재검색 (중복 제거)
+          // 원래 키워드도 함께 보내는 이유: Gemini가 원래 키워드와 다른 방향으로
+          // 확장했을 때도 원래 키워드 매칭 문서는 놓치지 않기 위해.
+          const combined = [...new Set([...keywords.slice(0, 4), ...expanded])];
+          docs = await runFTS(db, combined);
+          if (docs.length > 0) {
+            console.log(`[docs] 쿼리 확장으로 ${docs.length}건 검색됨:`, combined.slice(0, 6).join(', '));
+          }
+        }
+      } catch (e) {
+        console.error('Query expansion failed:', e?.message);
       }
-    } catch (e) {
-      // FTS 테이블이 없거나 쿼리 오류가 나도 전체 요청이 실패하지 않도록 흡수
-      console.error('FTS search failed:', e?.message);
     }
   }
 
