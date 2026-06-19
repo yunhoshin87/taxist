@@ -275,9 +275,11 @@ Cloudflare Dashboard → Pages → taxist → Settings → Environment Variables
 | `JWT_SECRET` | 무작위 64자 이상 문자열 (예: `openssl rand -base64 48`) | ✅ 필수 |
 
 > ⚠️ `JWT_SECRET`이 없으면 로그인·회원가입 전혀 동작 안 함  
-> ⚠️ `GEMINI_API_KEY`가 없으면 AI 답변 생성 불가 (쿼리 확장도 비활성화됨) — `/api/ocr`(첨부파일 OCR)도 같은 키를 쓰므로 함께 막힘  
-> 📌 `functions/api/ocr.js`는 별도 OCR API(Document AI 등) 없이 `GEMINI_API_KEY`로 Gemini 멀티모달 호출만 사용한다(`functions/_lib/gemini.js`의 `ocrToMarkdown()`). 업로드된 원본 파일은 어디에도 저장하지 않고, 변환된 마크다운 텍스트만 질문 본문(`questions.content`)에 합쳐서 저장한다. 별도 파일 저장소(R2 등)는 쓰지 않는다.  
-> ⚠️ 첨부파일 OCR도 답변 생성과 같은 Gemini 할당량 풀을 공유한다 — 첨부파일이 많은 질문일수록 API 호출 수가 늘어 분당/일일 한도가 더 빨리 소진될 수 있음 (§13.3 참고).
+> ⚠️ `GEMINI_API_KEY`가 없으면 AI 답변 생성 불가 (쿼리 확장도 비활성화됨) — `/api/ocr`의 PDF 변환도 같은 키를 쓰므로 함께 막힘 (xlsx 변환은 Gemini를 쓰지 않아 영향 없음)  
+> 📌 `functions/api/ocr.js`는 첨부파일(PDF/xlsx, 파일당 최대 10MB, 질문당 최대 3개)을 받아 마크다운으로 변환해 질문 본문(`questions.content`)에 합쳐서 저장한다. 업로드된 원본 파일은 어디에도 저장하지 않는다.
+>   - PDF: 별도 OCR API(Document AI 등) 없이 `GEMINI_API_KEY`로 Gemini 멀티모달 호출(`functions/_lib/gemini.js`의 `ocrToMarkdown()`)
+>   - xlsx: npm 패키지 없이 ZIP/XML을 직접 파싱(`functions/_lib/xlsx.js`의 `xlsxToMarkdown()`) — Gemini를 거치지 않아 더 정확하고 API 호출도 없음. 레거시 `.xls`(OLE2/BIFF 바이너리)는 구조가 달라 지원하지 않음
+> ⚠️ PDF 첨부파일 변환은 답변 생성과 같은 Gemini 할당량 풀을 공유한다 — PDF가 많은 질문일수록 API 호출 수가 늘어 분당/일일 한도가 더 빨리 소진될 수 있음 (§13.3 참고).
 
 ### 9.4 배포 빌드 디렉토리 준비
 

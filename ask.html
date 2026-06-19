@@ -912,11 +912,11 @@
           <div style="font-size:1.6rem;margin-bottom:8px">📂</div>
           <div class="drop-zone-text">
             <strong>클릭</strong>하거나 파일을 끌어다 놓으세요<br>
-            <span style="font-size:.74rem">PDF만 가능 · 파일당 최대 10MB · 최대 3개 · 업로드 시 OCR로 텍스트만 추출되며 원본 파일은 저장되지 않습니다</span>
+            <span style="font-size:.74rem">PDF, Excel(xlsx) · 파일당 최대 10MB · 최대 3개 · 업로드 시 텍스트만 추출되며 원본 파일은 저장되지 않습니다</span>
           </div>
         </div>
         <input type="file" id="fileInput" multiple
-               accept=".pdf"
+               accept=".pdf,.xlsx"
                onchange="onFileSelect(this.files)" />
         <div class="file-list" id="fileList"></div>
       </div>
@@ -1284,7 +1284,7 @@ function renderFileList() {
 function fileIcon(name) {
   const ext = name.split('.').pop().toLowerCase();
   if (ext === 'pdf') return '📄';
-  if (['png','jpg','jpeg'].includes(ext)) return '🖼️';
+  if (ext === 'xlsx') return '📊';
   return '📎';
 }
 function fmtSize(b) {
