@@ -419,3 +419,57 @@ ${chatMessage}
 
   return { reply, coverageGap: isGap };
 }
+
+/**
+ * 질문 첨부파일(PDF/이미지)을 Gemini 멀티모달로 읽어 마크다운 텍스트로 변환한다.
+ * 별도 OCR API(Document AI 등) 없이 기존 GEMINI_API_KEY만으로 처리 — 단, 답변 생성과
+ * 같은 할당량 풀을 공유하므로 첨부파일이 많은 질문은 API 호출 수가 그만큼 늘어난다.
+ * @param {ArrayBuffer} fileBuffer
+ * @param {string} mimeType  예: "application/pdf", "image/png", "image/jpeg"
+ * @param {string} apiKey    env.GEMINI_API_KEY
+ * @returns {Promise<string>} 변환된 마크다운 텍스트
+ */
+export async function ocrToMarkdown(fileBuffer, mimeType, apiKey) {
+  const bytes = new Uint8Array(fileBuffer);
+  let bin = "";
+  const CHUNK = 8192; // 8KB씩 변환 — 큰 파일에서 String.fromCharCode 인자 개수 제한 회피
+  for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  const base64Content = btoa(bin);
+
+  const prompt = `다음 문서(이미지 또는 PDF)에 적힌 내용을 마크다운으로 그대로 옮겨 적어주세요.
+- 문서에 없는 내용을 추가하거나 추측하지 마세요(할루시네이션 금지). 읽을 수 없는 부분은 [판독불가]로 표시하세요.
+- 표는 마크다운 표 형식으로, 일반 문단은 그대로 줄글로 옮깁니다.
+- 변환된 본문만 출력하고, 별도의 설명이나 인사말은 붙이지 마세요.`;
+
+  const url = `${BASE_URL}/${MODEL}:generateContent?key=${apiKey}`;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, RETRY_DELAY));
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Content } },
+          ],
+        }],
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0,          // OCR은 정확한 전사가 목적 — 창의성 불필요
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join("");
+      if (!text) throw new Error("Gemini OCR 응답이 비어있습니다");
+      return text.trim();
+    }
+    if ((resp.status === 503 || resp.status === 429) && attempt < MAX_RETRIES) continue;
+    throw new Error(`Gemini OCR 오류 (${resp.status}): ${await resp.text()}`);
+  }
+}
