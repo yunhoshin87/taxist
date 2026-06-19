@@ -1134,6 +1134,7 @@ const _taxCategories = _user?.tax_categories || [];
 const selectedTax    = _taxCategories[0] || '';
 (function renderTaxBadges() {
   const el = document.getElementById('taxBadges');
+  if (!el) return;
   if (!_taxCategories.length) {
     el.innerHTML = '<span style="font-size:.82rem;color:var(--neutral-400)">세목 정보 없음</span>';
     return;
