@@ -1,3 +1,34 @@
+<!--
+  ============================================================================
+  마이페이지 (mypage.html) — TAXIST 세무행정 AI 질의응답 서비스
+
+  순수 HTML + 인라인 <script> (프레임워크 없음, vanilla JS + fetch API)로
+  만든 Cloudflare Pages 정적 페이지. 로그인한 회원이 자신의 계정 정보,
+  이용권(무료체험/정식/만료) 상태, 통계, 최근 질문 이력을 확인하고
+  프로필을 수정하거나 이용권을 구매(현재는 데모/확인용)할 수 있다.
+
+  전체 구조
+  - <style>      : 카드형 레이아웃(좌: 프로필/계정정보, 우: 이용권/통계/요금제/이력) 스타일
+  - <body>
+      - nav      : 상단 네비게이션 (질문 작성 페이지로 이동, 로그아웃)
+      - .page
+          - 프로필 카드      : 아바타·이름·이메일·상태 배지(trial/active/expired)
+          - 계정 정보 카드   : 이름/소속/가입일/담당세목 보기·편집 폼
+          - 이용권 현황 카드 : 현재 플랜, 남은 일수, 진행률 바, 요약 통계 3칸
+          - 요금제 카드      : 무료체험 vs 정식 이용권 비교, 구매 버튼
+          - 최근 질문 이력   : /api/questions 결과를 카드 리스트로 표시
+      - 결제 모달 (#payModal) : 결제 수단 선택 + 카드정보 입력 UI (실제 결제 연동 전 데모 단계)
+      - 토스트 (#toast)       : 성공/실패 알림 표시
+      - <script>
+          - 인증 체크: localStorage의 taxist_token/taxist_user 없으면 로그인 페이지로 리다이렉트
+          - loadProfile()/renderProfile() : GET /api/users/me 응답으로 화면 전체 렌더링
+            (백엔드 /functions/api/users/me.js 가 status를 trial/active/expired/suspended 로 내려줌)
+          - toggleEdit()/saveProfile()    : 계정 정보 인라인 편집 + PATCH /api/users/me 저장
+          - loadHistory()                  : GET /api/questions 로 최근 질문 8건 + 무료체험 잔여 횟수 표시
+            (백엔드 /functions/api/questions/index.js 가 trial 회원에게만 trial_remaining/trial_limit 내려줌)
+          - 결제 모달 관련 함수들           : 현재는 실제 PG 연동 없이 안내 메시지만 표시 (관리자가 수동 처리)
+  ============================================================================
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -422,6 +453,10 @@
     <div class="col-left">
 
       <!-- 프로필 카드 -->
+      <!-- 아바타 이니셜, 이름, 이메일, 상태 배지는 모두 빈 값/로딩 텍스트로 시작했다가
+           renderProfile()에서 GET /api/users/me 응답으로 채워짐.
+           status-badge의 클래스(trial/active/expired)에 따라 배지 색상이 바뀐다
+           (CSS의 .status-badge.trial/.active/.expired 참고). -->
       <div class="card">
         <div class="avatar-wrap">
           <div class="avatar" id="avatarInitial">?</div>
@@ -435,6 +470,9 @@
       </div>
 
       <!-- 내 정보 -->
+      <!-- 보기 모드(#infoView)와 편집 모드(#editForm)를 토글로 전환한다.
+           편집 버튼 클릭 시 toggleEdit()가 .open 클래스를 붙여 editForm을 보이고
+           infoView는 숨긴다. 실제 저장은 saveProfile()에서 PATCH /api/users/me 호출. -->
       <div class="card">
         <div class="card-head">
           <span class="card-head-title">계정 정보</span>
@@ -462,6 +500,8 @@
             </div>
           </div>
 
+          <!-- 담당 세목 체크박스 6개의 value 값(corporate_tax, vat 등)이
+               백엔드 tax_categories 컬럼(JSON 배열)에 그대로 저장되는 코드값과 일치해야 한다. -->
           <div class="edit-form" id="editForm">
             <div class="field-group">
               <span class="field-label">이름</span>
@@ -496,6 +536,11 @@
     <div class="col-right">
 
       <!-- 이용권 현황 -->
+      <!-- renderProfile()에서 u.status(trial/expired/active)에 따라 분기 렌더링한다.
+           - trial : 가입일~만료일 사이 진행률(%)을 바로 표시, 남은 일수가 7일 이하면
+                     danger(빨강), 14일 이하면 warning(주황) 색으로 경고.
+           - expired : 바를 100%(회색, .expired)로 채우고 "이용 만료" 안내.
+           - active  : 만료 없는 정식 이용권이라 "∞"로 표시하고 바를 100% 채움. -->
       <div class="card">
         <div class="card-head">
           <span class="card-head-title">이용권 현황</span>
@@ -537,6 +582,11 @@
       </div>
 
       <!-- 요금제 -->
+      <!-- 무료 체험 카드는 항상 "현재 이용 중" 비활성 버튼으로 고정 표시하고,
+           그 아래 trialUsageText에 loadHistory()가 "n / 5건 사용"을 채워준다
+           (백엔드 GET /api/questions의 trial_remaining, trial_limit 필드 기반).
+           정식 이용권 구매 버튼(openPayModal)은 결제 모달을 띄운다 — 결제 자체는
+           실제 PG 연동 전이라 데모 동작(submitPayment에서 안내 토스트만 표시)이다. -->
       <div class="card">
         <div class="card-head">
           <span class="card-head-title">요금제</span>
@@ -588,6 +638,8 @@
       </div>
 
       <!-- 최근 질문 이력 -->
+      <!-- loadHistory()가 GET /api/questions 결과 중 최신 8건만 잘라서(.slice(0,8)) 보여준다.
+           "전체 보기"는 별도 목록 페이지가 없어 일단 질문 작성 페이지(ask.html)로 연결해둔 상태. -->
       <div class="card">
         <div class="card-head">
           <span class="card-head-title">최근 질문 이력</span>
@@ -602,7 +654,9 @@
   </div>
 </div>
 
-<!-- ══ 결제 모달 ══ -->
+<!-- ══ 결제 모달 ══ --><!-- pay-notice에 명시되어 있듯 결제 정보는 실제로 저장되지 않고,
+     submitPayment()는 안내 토스트만 띄운다. 실 결제 연동 전까지는
+     "구매 신청" 접수 + 관리자가 수동으로 이용 기간을 연장해주는 운영 방식이다. -->
 <div class="modal-backdrop" id="payModal">
   <div class="modal">
     <div class="modal-head">
@@ -689,6 +743,9 @@
 
 <script>
 /* ── 인증 ── */
+// 로그인 시 저장해둔 JWT(taxist_token)와 사용자 캐시(taxist_user)가 없으면
+// 인증되지 않은 접근으로 보고 즉시 로그인 페이지로 보낸다.
+// 이후 모든 API 호출에는 _token을 Authorization: Bearer 헤더로 붙여 보낸다.
 const _token = localStorage.getItem('taxist_token');
 const _user  = JSON.parse(localStorage.getItem('taxist_user') || 'null');
 if (!_token || !_user) { window.location.href = 'index.html'; }
@@ -721,6 +778,9 @@ function daysFromNow(str) {
 }
 
 /* ── 프로필 로드 ── */
+// GET /api/users/me 호출 (백엔드: functions/api/users/me.js handleGet).
+// 이 API는 trial 상태인데 trial_ends_at이 지났으면 DB의 status를 expired로
+// 갱신해서 내려주므로, 마이페이지에 들어올 때마다 최신 상태가 반영된다.
 async function loadProfile() {
   try {
     const res  = await fetch('/api/users/me', { headers: { Authorization: `Bearer ${_token}` } });
@@ -732,6 +792,8 @@ async function loadProfile() {
   }
 }
 
+// API 응답(u: 사용자 정보)을 받아 화면 전체(아바타/상태배지/정보목록/편집폼 초기값/
+// 이용권 현황/통계)를 한 번에 채워 넣는 핵심 렌더링 함수.
 function renderProfile(u) {
   /* 아바타 */
   document.getElementById('avatarInitial').textContent = (u.name || '?')[0];
@@ -739,6 +801,9 @@ function renderProfile(u) {
   document.getElementById('profileEmail').textContent  = u.email;
 
   /* 상태 배지 */
+  // 백엔드가 내려주는 status는 trial/active/expired/suspended 4가지인데,
+  // 배지 CSS 클래스는 active/expired/trial 3종류만 있어 suspended는 trial과
+  // 같은 색(주황 계열)으로 표시된다. 텍스트는 statusMap으로 한글 매핑.
   const badge = document.getElementById('statusBadge');
   const statusMap = { trial:'무료 이용중', active:'이용중', expired:'만료됨', suspended:'이용정지' };
   badge.className = 'status-badge ' + (u.status === 'active' ? 'active' : u.status === 'expired' ? 'expired' : 'trial');
@@ -759,11 +824,14 @@ function renderProfile(u) {
   });
 
   /* 이용권 현황 */
+  // status별로 이용권 카드(현재 플랜/남은 일수/진행률 바)를 다르게 그린다.
   const joined   = u.joined_at;
   const trialEnd = u.trial_ends_at;
   const now      = new Date();
 
   if (u.status === 'trial' && trialEnd) {
+    // 가입일~만료일 전체 기간 대비 현재까지 경과한 비율을 진행률 바(%)로 표시.
+    // 남은 일수가 적을수록 바 색을 경고색(danger/warning)으로 바꿔 만료를 미리 알린다.
     const daysLeft = daysFromNow(trialEnd);
     const total    = daysBetween(joined, trialEnd);
     const elapsed  = daysBetween(joined, now.toISOString());
@@ -782,6 +850,9 @@ function renderProfile(u) {
     document.getElementById('barEnd').textContent   = fmtDate(trialEnd);
 
   } else if (u.status === 'expired') {
+    // 만료된 회원: 남은 일수를 0으로 고정하고 바를 회색 100%로 채워 "더 이상
+    // 진행되지 않는 상태"임을 시각적으로 보여준다. 질문 등록 자체는 백엔드
+    // (functions/api/questions/index.js)에서 EXPIRED 코드로 막힌다.
     document.getElementById('planTitle').textContent  = '이용 만료';
     document.getElementById('planDesc').textContent   = '이용권을 구매하면 계속 사용할 수 있습니다.';
     document.getElementById('daysNum').textContent    = '0';
@@ -790,6 +861,8 @@ function renderProfile(u) {
     fill.style.width = '100%'; fill.className = 'plan-bar-fill expired';
 
   } else if (u.status === 'active') {
+    // 정식 이용권(결제 완료) 회원: 만료일 개념이 없으므로 "∞"로 표시하고
+    // 진행률 바도 항상 가득 채운 상태로 보여준다.
     document.getElementById('planTitle').textContent = '정식 이용권';
     document.getElementById('planDesc').textContent  = '이용 중';
     document.getElementById('daysNum').textContent   = '∞';
@@ -805,6 +878,8 @@ function renderProfile(u) {
 }
 
 /* ── 편집 토글 ── */
+// open 인자를 안 주면(편집 버튼 클릭) 현재 닫혀있는지 보고 반대로 토글하고,
+// 명시적으로 false를 주면(취소/저장 후) 강제로 닫는다.
 function toggleEdit(open) {
   const isOpen = open !== undefined ? open : document.getElementById('editForm').classList.contains('open') === false;
   document.getElementById('editForm').classList.toggle('open', isOpen);
@@ -813,6 +888,9 @@ function toggleEdit(open) {
 }
 
 /* ── 프로필 저장 ── */
+// PATCH /api/users/me 호출 (백엔드: functions/api/users/me.js handlePatch).
+// 백엔드는 값이 있는 필드만 동적으로 UPDATE하므로, 여기서도 빈 값 검증을
+// 먼저 해서 사용자에게 바로 피드백을 준다.
 async function saveProfile() {
   const name = document.getElementById('editName').value.trim();
   const org  = document.getElementById('editOrg').value.trim();
@@ -842,12 +920,16 @@ async function saveProfile() {
 }
 
 /* ── 질문 이력 ── */
+// GET /api/questions 호출 (백엔드: functions/api/questions/index.js handleList).
+// 이 응답에는 questions 배열 외에도 trial_remaining/trial_limit이 들어있는데,
+// 이는 무료체험(trial) 회원에게만 채워지는 값이고 정식/만료 회원은 null이다.
 async function loadHistory() {
   try {
     const res  = await fetch('/api/questions', { headers: { Authorization: `Bearer ${_token}` } });
     const data = await res.json();
 
-    // 무료 체험 사용량 표시
+    // 무료 체험 사용량 표시 — trial_remaining이 null/undefined가 아닐 때만(즉 trial 회원일 때만)
+    // "n / 5건 사용" 텍스트를 채운다. 남은 건수가 0이면 빨강, 2건 이하면 주황으로 경고색 처리.
     const usageEl = document.getElementById('trialUsageText');
     if (usageEl && data.trial_remaining !== null && data.trial_remaining !== undefined) {
       const used = data.trial_limit - data.trial_remaining;
@@ -856,6 +938,7 @@ async function loadHistory() {
     } else if (usageEl) {
       usageEl.textContent = '';
     }
+    // 마이페이지에서는 전체 목록이 아니라 최신 8건만 미리보기로 보여준다.
     const list = (data.questions || []).slice(0, 8);
     const el   = document.getElementById('histList');
     if (!list.length) {
@@ -863,6 +946,9 @@ async function loadHistory() {
       return;
     }
     el.innerHTML = list.map(q => {
+      // q.status는 백엔드 questions 테이블 값(processing/done/error) 중
+      // done/error만 배지로 표시하고, processing은 아무 배지도 안 보여준다
+      // (마이페이지는 동기 처리 응답 이후 조회라 보통 processing 상태로 남지 않음).
       const statusEl = q.status === 'done'
         ? `<span class="hist-status-done">완료</span>`
         : q.status === 'error'
@@ -880,6 +966,9 @@ async function loadHistory() {
 }
 
 /* ── 결제 모달 ── */
+// openPayModal(plan)은 어떤 플랜에서 호출됐는지 plan 인자를 받지만,
+// 현재는 정식 이용권(월 29,000원) 단일 플랜만 있어 인자를 사용하지 않고
+// 모달 안의 가격/플랜명도 고정 텍스트로 박혀 있다 (향후 플랜 다양화 시 분기 필요).
 function openPayModal() {
   document.getElementById('payModal').classList.add('open');
 }
@@ -891,6 +980,8 @@ document.getElementById('payModal').addEventListener('click', e => {
 });
 
 /* 결제 수단 전환 */
+// 신용카드를 선택했을 때만 카드번호/유효기간/CVC 입력 필드(#cardFields)를 보여주고,
+// 계좌이체·가상계좌 선택 시에는 숨긴다 (해당 수단들은 별도 입력 필드가 없는 데모 상태).
 document.querySelectorAll('input[name="payMethod"]').forEach(r => {
   r.addEventListener('change', () => {
     const show = r.value === 'card';
@@ -910,12 +1001,16 @@ function fmtExpiry(el) {
 }
 
 /* 결제 제출 (현재는 확인 메시지) */
+// 실제 PG(결제대행사) 연동 전 단계라 카드 정보를 서버로 전송하지 않고,
+// 단순히 접수 안내 토스트만 띄운 뒤 모달을 닫는다. 이용 기간 연장은
+// pay-notice에 적힌 대로 관리자가 수동으로 처리한다.
 async function submitPayment() {
   showToast('결제 요청이 접수되었습니다. 관리자가 확인 후 이용 기간을 연장해 드립니다.', 'success');
   closePayModal();
 }
 
 /* ── 초기화 ── */
+// 페이지 로드 시 프로필(이용권 현황 포함)과 질문 이력을 병렬로 가져온다.
 loadProfile();
 loadHistory();
 </script>

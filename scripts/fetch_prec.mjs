@@ -1,5 +1,18 @@
 /**
  * 국가법령정보 API - 판례 전용 수집 스크립트
+ *
+ * [목적]
+ * 국가법령정보센터 공개 API(law.go.kr/DRF)에서 세목별 키워드로 판례(대법원 판결,
+ * 조세심판원·감사원·이의신청·과세적부심사 결정례)를 검색·상세조회해 세목별 마크다운
+ * 파일(판례자료/{세목}_판례.md)로 저장하는 1차 수집 스크립트.
+ *
+ * [실행 시점 / 다른 스크립트와의 관계]
+ * .github/workflows/update_laws.yml 워크플로에는 등록되어 있지 않다(자동 실행되는
+ * 것은 fetch_all.mjs뿐). fetch_all.mjs 등 다른 어떤 스크립트도 이 파일을 import하거나
+ * 호출하지 않으므로, 운영자가 판례만 별도로 다시 수집하고 싶을 때 수동으로 실행하는
+ * 보조 스크립트로 보인다. 수집 후 D1에 반영하려면 seed_prec.mjs(또는 seed_d1_api.mjs)를
+ * 별도로 수동 실행해야 한다(이 스크립트는 D1을 직접 건드리지 않음).
+ *
  * 사용법: node scripts/fetch_prec.mjs [API키]
  *         API키 생략 시 환경변수 LAW_API_KEY 사용
  */
@@ -21,6 +34,8 @@ const MANIFEST_FILE = path.join(BASE_DIR, "law_manifest.json");
 
 // ── 세목별 판례·결정례 검색 키워드 ─────────────────────────
 // 대법원 판결 + 조세심판원·감사원·이의신청·과세적부심사 결정례 모두 수집
+// law.go.kr API는 세목 코드로 직접 필터링하는 기능이 없어, 세목별로 대표
+// 키워드를 미리 정의해두고 키워드 검색을 여러 번 반복해 세목별 판례군을 모은다.
 const PREC_QUERIES = {
   "법인세": [
     "법인세", "이월결손금", "부당행위계산부인",
@@ -60,6 +75,8 @@ const PREC_QUERIES = {
 };
 
 // ── 유틸 ─────────────────────────────────────────────────────
+// 요청 사이 지연 — law.go.kr API에 짧은 시간에 과도한 요청을 보내지 않기 위함
+// (429 Rate limit 응답을 받으면 apiGet에서 추가로 더 길게 대기한다)
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function mkdirp(dir) { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); }
 function fmtDate(raw = "") {
@@ -78,21 +95,23 @@ function log(msg) {
 }
 
 // ── API 호출 ─────────────────────────────────────────────────
+// 최대 3회 재시도: 일시적 네트워크 오류나 429(rate limit)는 재시도로 복구 가능하지만
+// 무한 재시도는 배치 전체를 지연시키므로 상한을 둔다.
 async function apiGet(endpoint, params) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
   url.searchParams.set("OC",   API_KEY);
-  url.searchParams.set("type", "JSON");
+  url.searchParams.set("type", "JSON"); // JSON 응답을 요청 (API는 XML도 지원하나 파싱 편의상 JSON 사용)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url.toString(), { signal: AbortSignal.timeout(30000) });
-      if (res.status === 429) { log("  Rate limit — 10초 대기..."); await sleep(10000); continue; }
+      if (res.status === 429) { log("  Rate limit — 10초 대기..."); await sleep(10000); continue; } // rate limit 시 일반 재시도보다 더 길게 대기
       if (!res.ok) { log(`  HTTP ${res.status}`); return null; }
       const text = await res.text();
       try { return JSON.parse(text); }
       catch {
-        // XML 에러 응답인 경우
+        // XML 에러 응답인 경우 (API가 오류 시 JSON 대신 XML을 반환하는 경우가 있음)
         log(`  JSON 파싱 실패 (응답 미리보기): ${text.slice(0, 120)}`);
         return null;
       }
@@ -106,11 +125,13 @@ async function apiGet(endpoint, params) {
 
 // ── 판례 목록 검색 ──────────────────────────────────────────
 // 반환: [{ 판례일련번호, 사건명, 사건번호, 선고일자, 법원명, 데이터출처명 }, ...]
+// 페이지(20건씩)를 돌며 maxCount에 도달하거나 더 이상 결과가 없을 때까지 수집.
+// 판례일련번호로 중복을 걸러내(seen Set) 같은 판례가 여러 키워드에 걸려도 한 번만 보관.
 async function searchPrec(keyword, maxCount = 50) {
   const results = []; const seen = new Set();
   let page = 1;
   while (results.length < maxCount) {
-    await sleep(DELAY_MS);
+    await sleep(DELAY_MS); // 페이지 요청 사이 지연 — API 서버 부하 분산
     const data = await apiGet("lawSearch.do", {
       target:  "prec",
       query:   keyword,
@@ -135,8 +156,10 @@ async function searchPrec(keyword, maxCount = 50) {
 }
 
 // ── 판례 상세 조회 (대법원 판례만 가능) ──────────────────────
+// law.go.kr 상세조회 API는 대법원 판례만 지원하므로, 조세심판원 결정 등
+// 다른 출처는 상세조회가 실패(p["사건번호"] 없음)하며 호출부에서 기본 검색결과로 대체한다.
 async function fetchPrecDetail(precId) {
-  await sleep(DELAY_MS);
+  await sleep(DELAY_MS); // 상세조회 요청 사이 지연
   const data = await apiGet("lawService.do", { target: "prec", ID: precId }); // ← ID 파라미터
   if (!data) return null;
   const p = data["PrecService"] || data;
@@ -145,6 +168,8 @@ async function fetchPrecDetail(precId) {
 }
 
 // ── 판례 → MD 변환 ───────────────────────────────────────────
+// HTML 태그가 섞인 응답 필드(판시사항/판결요지 등)는 <br>를 줄바꿈으로,
+// 나머지 태그는 제거해 마크다운에 그대로 삽입 가능한 텍스트로 정리한다.
 function precToMd(list, category) {
   const today = new Date().toISOString().slice(0, 10);
   const lines = [
@@ -229,14 +254,14 @@ async function main() {
     log(`\n[${category}] 판례 수집 중...`);
 
     // 1단계: 키워드 검색 (기본 정보 수집)
-    const itemMap = new Map(); // 판례일련번호 → 검색결과 객체
+    const itemMap = new Map(); // 판례일련번호 → 검색결과 객체 (중복 제거용)
     for (const kw of keywords) {
       const items = await searchPrec(kw, 50);
       for (const p of items) {
         const pid = str(p["판례일련번호"]);
         if (pid && !itemMap.has(pid)) itemMap.set(pid, p);
       }
-      if (itemMap.size >= 100) break;
+      if (itemMap.size >= 100) break; // 세목당 최대 100건으로 제한 — 과도한 API 호출/파일 크기 방지
     }
     log(`  → 검색결과 ${itemMap.size}건, 상세 조회 시작...`);
 

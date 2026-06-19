@@ -1,3 +1,5 @@
+// /api/admin/questions — 관리자용 전체 질문/답변 목록 조회(GET, 세목·상태
+// 필터 + 페이지네이션) 및 질문 상태 강제 변경(PUT) — 품질 검토·재답변 표시용
 import { getUser, requireAdmin, json } from "../../_lib/auth.js";
 
 export async function onRequest(context) {

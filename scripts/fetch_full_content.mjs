@@ -1,10 +1,25 @@
 /**
  * NTS 해석례 전문 일괄 수집 스크립트
  *
+ * [목적]
+ * D1(documents 테이블)에 이미 적재돼 있지만 본문이 "요약(is_summary=1)" 상태인
+ * 세법해석례 문서들에 대해, 국세법령정보시스템(taxlaw.nts.go.kr)의 비공개 AJAX
+ * 엔드포인트(/action.do)를 직접 호출해 전문(full content)을 받아와 D1 documents.content를
+ * UPDATE하는 "후처리/보강" 스크립트. 즉 fetch_taxlaw_interp.mjs 등으로 1차 수집된
+ * 요약 데이터를 전문으로 업그레이드하는 별도 배치 작업이며, 다른 스크립트가 이 파일을
+ * import하거나 호출하지 않는다(독립 실행 전용). 마찬가지로 이 파일도 다른 스크립트를
+ * 호출하지 않는다 — D1과 NTS API에 직접 접근.
+ *
  * - Phase 1: nts_doc_id 있는 문서 → NTS API 직접 전문 조회 (9,055건)
  * - Phase 2: nts_doc_id 없는 문서 → 제목 키워드 검색 → ID 확보 → 전문 조회 (13,086건)
  * - 체크포인트 저장 → 중단 후 재시작 가능
  * - 완료 후 FTS5 재인덱싱
+ *
+ * [실행 시점]
+ * .github/workflows/update_laws.yml 워크플로에는 등록되어 있지 않다(워크플로는
+ * fetch_all.mjs만 자동 실행). 즉 자동 실행되지 않으며, 운영자가 필요할 때 수동으로
+ * 실행하는 1회성/유지보수용 스크립트다. 또한 Cloudflare D1에 직접 쓰기 위해
+ * wrangler 로그인 토큰이 필요하므로(getToken 참고) CI 환경보다는 로컬 실행에 적합하다.
  *
  * 사용법:
  *   node scripts/fetch_full_content.mjs           # 전체 실행
@@ -12,6 +27,9 @@
  *   node scripts/fetch_full_content.mjs --phase1  # Phase 1만
  *   node scripts/fetch_full_content.mjs --phase2  # Phase 2만
  *   node scripts/fetch_full_content.mjs --reset   # 체크포인트 초기화 후 재시작
+ *
+ * 사전 조건: `npx wrangler login`으로 Cloudflare 인증이 되어 있어야 함(~/.wrangler/config/default.toml).
+ * --dry-run 모드에서는 토큰 없이도 동작(D1 호출을 건너뜀).
  */
 
 import fs    from "fs";
@@ -42,6 +60,9 @@ const ONLY_PHASE1 = PHASE1 && !PHASE2;
 const ONLY_PHASE2 = PHASE2 && !PHASE1;
 
 // ── 인증 토큰 ────────────────────────────────────────────────────
+// wrangler CLI가 로그인 시 로컬에 저장하는 OAuth 토큰을 재사용해 D1 REST API를
+// 직접 호출한다(wrangler 명령 대신 fetch로 D1 HTTP API를 호출하는 방식).
+// HOME/USERPROFILE 두 경로를 모두 시도해 OS(Win/Linux/Mac) 차이를 흡수.
 function getToken() {
   const paths = [
     path.join(process.env.USERPROFILE || process.env.HOME, ".wrangler", "config", "default.toml"),
@@ -68,6 +89,9 @@ function log(msg) {
 }
 
 // ── 체크포인트 ──────────────────────────────────────────────────
+// 장시간 실행되는 배치(수천~수만 건)이므로 중간에 끊겨도(네트워크 오류, 강제 종료 등)
+// 처음부터 다시 돌리지 않도록 처리 완료/스킵된 문서 id를 파일로 영속화한다.
+// --reset 옵션을 주면 이 체크포인트 파일을 삭제하고 완전히 새로 시작한다.
 function loadCheckpoint() {
   if (DO_RESET && fs.existsSync(CHECKPOINT)) {
     fs.unlinkSync(CHECKPOINT);
@@ -124,8 +148,13 @@ async function getTotalSummaryCount(hasNtsId) {
 }
 
 // ── NTS HTTP 헬퍼 ────────────────────────────────────────────────
+// taxlaw.nts.go.kr은 공식 공개 API가 아니라 브라우저가 호출하는 내부 AJAX
+// 엔드포인트(/action.do)이므로, 서버가 정상 응답하려면 일반 브라우저 세션처럼
+// 보이도록 세션 쿠키(JSESSIONID 등)와 Referer/Origin 헤더를 갖춰야 한다.
 let _cookies = "";
 
+// 모든 NTS 요청 사이에 주는 지연. NTS 서버에 과도한 부하를 주지 않고
+// 짧은 시간에 많은 요청을 보내 차단(rate limit/세션 차단)되는 것을 피하기 위함.
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function httpsRequest(method, urlPath, body = null) {
@@ -134,18 +163,21 @@ function httpsRequest(method, urlPath, body = null) {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120",
       "Accept-Language": "ko-KR,ko;q=0.9",
       "Connection": "keep-alive",
-      ...(_cookies ? { Cookie: _cookies } : {}),
+      ...(_cookies ? { Cookie: _cookies } : {}), // 세션 유지를 위해 이전 응답에서 받은 쿠키를 매 요청에 동봉
     };
     if (method === "POST" && body) {
       headers["Content-Type"]   = "application/x-www-form-urlencoded";
       headers["Content-Length"] = Buffer.byteLength(body);
+      // 서버가 정상 페이지 요청이 아닌 AJAX 요청으로 인식하도록 브라우저와 동일한 헤더를 모방
       headers["X-Requested-With"] = "XMLHttpRequest";
       headers["Accept"] = "application/json, */*; q=0.01";
       headers["Origin"]  = `https://${NTS_HOST}`;
+      // Referer 검증을 우회하기 위해 실제 검색 화면 URL을 명시 (없으면 차단되는 경우가 있음)
       headers["Referer"] = `https://${NTS_HOST}/qt/USEQTA001L.do?ntstDcmClCd=02`;
     }
     const opts = { hostname: NTS_HOST, port: 443, path: urlPath, method, headers, timeout: 25000 };
     const req = https.request(opts, res => {
+      // 응답의 Set-Cookie를 누적 병합해 다음 요청에 다시 실어 보낸다(세션 유지).
       const setCookies = res.headers["set-cookie"] || [];
       if (setCookies.length) {
         const map = Object.fromEntries((_cookies || "").split("; ").filter(Boolean).map(p => p.split("=")));
@@ -164,6 +196,8 @@ function httpsRequest(method, urlPath, body = null) {
   });
 }
 
+// 실제 사용자가 검색 페이지에 처음 접속했을 때처럼 GET 요청을 보내 세션 쿠키를
+// 발급받는다. 세션이 끊기거나(타임아웃) 응답이 비정상(HTML 에러 페이지)일 때 재호출됨.
 async function ntsSession() {
   try {
     await httpsRequest("GET", "/qt/USEQTA001L.do?ntstDcmClCd=02");
@@ -171,7 +205,9 @@ async function ntsSession() {
 }
 
 async function ntsAction(actionId, paramData) {
-  await sleep(DELAY_MS);
+  await sleep(DELAY_MS); // 요청마다 고정 지연 — NTS 서버 부하 분산 및 차단 회피
+  // 최대 3회 재시도: 세션 만료/일시적 네트워크 오류는 재시도로 복구 가능하지만,
+  // 무한 재시도는 한 건이 막혀 전체 배치를 지연시키므로 상한을 둠.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const body = new URLSearchParams({
@@ -179,6 +215,8 @@ async function ntsAction(actionId, paramData) {
         paramData: JSON.stringify(paramData),
       }).toString();
       const res = await httpsRequest("POST", "/action.do", body);
+      // 정상 JSON이 아니라 "<!"로 시작하는 HTML(로그인/에러 페이지)이 오면
+      // 세션이 끊긴 것으로 판단해 세션을 재초기화 후 재시도
       if (!res.body || res.body.trimStart().startsWith("<!")) {
         await ntsSession();
         await sleep(1500);
@@ -188,13 +226,16 @@ async function ntsAction(actionId, paramData) {
       if (json.status === "SUCCESS") return json.data || json;
       return null;
     } catch (e) {
-      if (attempt < 2) await sleep(2000);
+      if (attempt < 2) await sleep(2000); // 네트워크 예외 시 점진 대기 후 재시도
     }
   }
   return null;
 }
 
 // ── NTS 전문 조회 ────────────────────────────────────────────────
+// NTS 응답은 HTML 태그가 섞인 텍스트(<br>, &nbsp; 등)이므로 정규식으로 태그를
+// 제거하고 HTML 엔티티를 디코딩해 순수 텍스트로 변환한다. 별도 HTML 파서
+// 라이브러리 없이 정규식 치환만으로 충분히 처리 가능한 단순 구조라 의존성을 줄임.
 function stripHtml(s) {
   return (s || "")
     .replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
@@ -236,6 +277,9 @@ async function fetchDetailById(ntstDcmId) {
 }
 
 // ── NTS 제목 검색으로 ID 확보 ────────────────────────────────────
+// Phase 2 대상 문서는 nts_doc_id가 없으므로 직접 조회가 불가능하다. 대신
+// 문서 제목에서 핵심 키워드를 뽑아 NTS 검색 API에 던져 동일/유사 문서를 찾고
+// 그 검색 결과의 ID로 상세 조회를 수행하는 간접 매칭 방식을 사용한다.
 function extractKeyword(name) {
   // 문서명에서 접두사 제거 후 핵심 키워드 추출
   const clean = name
@@ -294,6 +338,8 @@ async function searchNtsId(name) {
 }
 
 // ── 병렬 처리 헬퍼 ──────────────────────────────────────────────
+// CONCURRENCY(동시 요청 수)만큼씩 잘라서 병렬 처리 — 전체를 한 번에 Promise.all로
+// 돌리면 NTS 서버에 과도한 동시 요청이 가서 차단될 수 있으므로 청크 단위로 제한.
 async function pMap(arr, fn, concurrency) {
   const results = [];
   for (let i = 0; i < arr.length; i += concurrency) {
@@ -305,6 +351,10 @@ async function pMap(arr, fn, concurrency) {
 }
 
 // ── Phase 1: nts_doc_id 있는 문서 전문 수집 ─────────────────────
+// D1을 BATCH_SIZE(500건) 단위로 페이지네이션 조회하면서, 체크포인트의
+// phase1_done_ids에 이미 있는 id는 건너뛴다(재시작 시 중복 작업 방지).
+// CONCURRENCY만큼 병렬로 NTS 상세 조회 → 성공 시 즉시 D1 UPDATE.
+// 50건마다, 그리고 배치(오프셋) 끝마다 체크포인트를 저장해 중단 시 손실을 최소화.
 async function runPhase1(cp) {
   const total = await getTotalSummaryCount(true);
   const doneSet = new Set(cp.phase1_done_ids);
@@ -356,6 +406,9 @@ async function runPhase1(cp) {
 }
 
 // ── Phase 2: nts_doc_id 없는 문서 → 검색 → 전문 수집 ────────────
+// Phase 1과 달리 done(완료)뿐 아니라 skip(검색 실패로 포기) 목록도 추적한다.
+// 키워드 검색은 결과가 모호할 수 있어 같은 문서를 매 실행마다 반복 검색하지 않도록
+// 한 번 실패한 문서는 skip 처리해 재시작 시 다시 시도하지 않는다.
 async function runPhase2(cp) {
   const total = await getTotalSummaryCount(false);
   const doneSet = new Set(cp.phase2_done_ids);
@@ -373,6 +426,7 @@ async function runPhase2(cp) {
     log(`  배치 offset=${offset}: ${docs.length}건 조회, ${pending.length}건 미완료`);
 
     // Phase 2는 검색이 필요하므로 순차 처리 (NTS 검색 부하 고려)
+    // (Phase 1처럼 pMap으로 병렬화하지 않고 for-of로 한 건씩 순차 실행)
     for (const doc of pending) {
       try {
         // 제목으로 NTS 검색해 ID 확보
@@ -430,6 +484,10 @@ async function runPhase2(cp) {
 }
 
 // ── FTS5 재인덱싱 ───────────────────────────────────────────────
+// content 컬럼이 대량으로 UPDATE되면 SQLite FTS5 가상 테이블(documents_fts)의
+// 색인이 최신 본문을 반영하지 못할 수 있어, 전체 수집 종료 후 한 번 강제로
+// 재구축한다. wrangler CLI를 별도 프로세스로 실행(이 스크립트는 D1 REST API를
+// 직접 쓰지만, FTS5 rebuild 같은 관리형 명령은 wrangler d1 execute로 위임).
 async function rebuildFts() {
   log("\nFTS5 전체 재인덱싱 중...");
   try {

@@ -1,3 +1,13 @@
+<!--
+  TAXIST 로그인 페이지 (정적 HTML, Cloudflare Pages 배포)
+  - 프레임워크 없는 vanilla JS + inline <script>. 백엔드 연동은 fetch API로 직접 호출.
+  - 일반 회원/관리자 구분 없이 동일한 로그인 폼을 사용하며, 로그인 성공 응답의
+    user.role 값에 따라 이동할 페이지(관리자 대시보드 vs 질문 작성 화면)만 분기한다.
+  - 연동 백엔드: functions/api/auth/login.js (POST /api/auth/login)
+    요청 바디: { email, password } / 성공 시 { token, user } 반환
+    실패 시 401(자격 불일치)·403(정지 계정)·500(서버 오류) 등 status별 error 메시지를 반환하며,
+    프론트는 status 코드를 구분하지 않고 모두 동일하게 alertBox에 표시한다(메시지 텍스트만 다름).
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -208,6 +218,7 @@
 </head>
 <body>
 
+<!-- 상단 헤더: 로고 + 회원가입 페이지로의 진입 링크 (가입 안 한 사용자를 위한 안내) -->
 <header>
   <a href="index.html" class="logo">TAXIST<span class="logo-dot">.</span></a>
   <span class="header-link">계정이 없으신가요? <a href="signup.html">무료 가입하기</a></span>
@@ -223,8 +234,12 @@
     <h1 class="card-title">로그인</h1>
     <p class="card-sub">아이디와 비밀번호를 입력해 주세요.<br>관리자·일반 회원 구분 없이 동일한 로그인 화면을 사용합니다.</p>
 
+    <!-- 로그인 실패 시 메시지를 표시하는 영역. 기본은 display:none(숨김)이며
+         handleLogin()에서 에러가 발생할 때만 display:block으로 보여준다. -->
     <div class="alert error" id="alertBox"></div>
 
+    <!-- 폼 submit(엔터 입력 포함) 시 handleLogin()이 실행되며, 내부에서
+         preventDefault()로 기본 폼 전송(페이지 새로고침)을 막고 fetch로 대체한다. -->
     <form id="loginForm" onsubmit="handleLogin(event)">
       <div class="form-group">
         <label for="email">아이디</label>
@@ -251,6 +266,7 @@
       아직 계정이 없으신가요? <a href="signup.html">무료로 시작하기 →</a>
     </p>
 
+    <!-- role에 따라 이동 경로가 갈리는 것을 가입 전에 미리 안내하는 문구 -->
     <div class="notice">
       로그인 후 권한에 따라 자동으로 이동합니다.<br>
       일반 회원 → 질문 작성 화면 &nbsp;|&nbsp; 관리자 → 관리자 대시보드
@@ -259,6 +275,9 @@
 </main>
 
 <script>
+// 로그인 폼 제출 핸들러.
+// 클라이언트 단에서는 이메일/비밀번호 형식 검증을 하지 않고(input의 required만 사용),
+// 실제 자격 증명 검증은 전부 서버(functions/api/auth/login.js)에 위임한다.
 async function handleLogin(e) {
   e.preventDefault();
   const email    = document.getElementById('email').value.trim();
@@ -266,6 +285,7 @@ async function handleLogin(e) {
   const btn      = document.getElementById('submitBtn');
   const alertBox = document.getElementById('alertBox');
 
+  // 재요청 시 이전 에러 메시지를 지우고, 중복 클릭 방지를 위해 버튼을 비활성화 + 로딩 텍스트로 변경
   alertBox.style.display = 'none';
   btn.textContent = '로그인 중...';
   btn.disabled = true;
@@ -278,6 +298,11 @@ async function handleLogin(e) {
     });
     const data = await res.json();
 
+    // res.ok가 false인 경우(400/401/403/500 등) — 백엔드가 보낸 error 메시지를 그대로 노출.
+    // 상태 코드별로 분기하지 않는 이유: login.js가 이미 "이메일 또는 비밀번호가
+    // 올바르지 않습니다"(401, 미가입/오답 공통) / "이용이 정지된 계정입니다"(403) /
+    // "서버 오류가 발생했습니다"(500) 등 사용자에게 보여줄 문구를 완성된 형태로 내려주므로
+    // 프론트는 그대로 alertBox에 표시만 하면 된다.
     if (!res.ok) {
       alertBox.textContent = data.error || '로그인에 실패했습니다.';
       alertBox.style.display = 'block';
@@ -286,9 +311,13 @@ async function handleLogin(e) {
       return;
     }
 
+    // 로그인 성공 — JWT와 사용자 정보를 localStorage에 저장해 이후 페이지에서
+    // Authorization 헤더 구성 및 화면 표시(이름 등)에 재사용한다.
     localStorage.setItem('taxist_token', data.token);
     localStorage.setItem('taxist_user', JSON.stringify(data.user));
 
+    // user.role 값으로 이동 경로 분기. adminAuth/userAuth 플래그는 각 페이지에서
+    // 별도의 간단한 접근 가드(로그인 여부 체크)로 사용하기 위해 함께 저장한다.
     if (data.user.role === 'admin') {
       localStorage.setItem('adminAuth', 'true');
       localStorage.setItem('adminName', data.user.name);
@@ -299,6 +328,8 @@ async function handleLogin(e) {
       window.location.href = 'ask.html';
     }
   } catch {
+    // fetch 자체가 실패(네트워크 오류 등)한 경우 — 서버가 응답을 못 준 상태이므로
+    // res.ok 분기와는 별도로 고정 메시지를 보여준다.
     alertBox.textContent = '서버 연결에 실패했습니다.';
     alertBox.style.display = 'block';
     btn.textContent = '로그인';

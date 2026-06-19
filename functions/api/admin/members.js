@@ -1,3 +1,5 @@
+// /api/admin/members — 관리자 회원 목록 조회(GET, 검색/상태필터) 및
+// 회원 상태·무료기간 직접 수정(PUT) — 관리자페이지 회원관리 화면에서 사용
 import { getUser, requireAdmin, json } from "../../_lib/auth.js";
 
 export async function onRequest(context) {
@@ -16,6 +18,7 @@ async function handleGet({ request, env }) {
   const search = url.searchParams.get("q") || "";
   const status = url.searchParams.get("status") || "";
 
+  // 관리자 계정 자신은 회원 목록에 노출하지 않는다(role != 'admin')
   let query = `
     SELECT u.id, u.name, u.email, u.org, u.tax_categories,
            u.role, u.status, u.joined_at, u.trial_ends_at, u.last_login_at,
@@ -46,6 +49,8 @@ async function handleGet({ request, env }) {
   });
 }
 
+// 관리자가 회원 상태를 수동으로 변경(정지/정상화 등)하거나, 무료기간을
+// 연장(trial_ends_at 갱신 — 이 경우 status를 'trial'로 강제 복원)한다.
 async function handlePut({ request, env }) {
   const { id, status, trial_ends_at } = await request.json();
   if (!id) return json({ error: "id 필요" }, 400);
@@ -55,6 +60,7 @@ async function handlePut({ request, env }) {
       .bind(status, id).run();
   }
   if (trial_ends_at) {
+    // 만료(expired)됐던 회원도 무료기간을 늘려주면 다시 trial 상태로 되돌린다
     await env.DB.prepare("UPDATE users SET trial_ends_at = ?, status = 'trial' WHERE id = ?")
       .bind(trial_ends_at, id).run();
   }

@@ -1,6 +1,32 @@
 /**
  * 판례 폴더 생성 + 문서 시딩 (wrangler OAuth 토큰 자동 사용)
  *
+ * ◆ 목적
+ *   fetch_prec.mjs가 판례자료/ 폴더에 세목별로 모아둔 판례 MD 파일
+ *   (법인세_판례.md 등)을 D1에 적재한다. seed_d1.mjs/seed_d1_api.mjs와
+ *   달리 이 스크립트는 "판례-OO" 폴더가 D1 folders 테이블에 없으면 직접
+ *   생성하는 단계(1~2단계)까지 포함하며, 진행 로그를 시간 타임스탬프와
+ *   함께 출력해 장시간 실행 시 진행 상황을 추적하기 쉽게 만들어졌다.
+ *
+ * ◆ 사용법
+ *   node scripts/seed_prec.mjs  (인자 없음)
+ *
+ * ◆ 필요 환경
+ *   사전 조건: npx wrangler login 완료 상태. 토큰을 USERPROFILE/HOME 양쪽
+ *   경로에서 순서대로 탐색(readWranglerToken)하여 OS 환경 차이에 대응한다.
+ *
+ * ◆ 실행 시점
+ *   수동 실행 전용. .github/workflows/update_laws.yml에는 등록되어 있지
+ *   않음 (워크플로는 fetch_all.mjs만 호출).
+ *
+ * ◆ 다른 스크립트와의 관계
+ *   입력: fetch_prec.mjs가 생성한 판례자료/*.md.
+ *   seed_d1.mjs/seed_d1_api.mjs의 "판례자료"(폴더 id=13, 파일 단위로 세목
+ *   미분류) 처리와 달리, 이 스크립트는 세목별로 별도 폴더(판례-법인세 등)를
+ *   만들어 더 세분화해서 적재한다 — 즉 판례 데이터를 이중으로(폴더 id=13에도,
+ *   세목별 판례-OO 폴더에도) 넣을 수 있으므로 운영 시 어떤 방식을 쓸지
+ *   확인이 필요하다.
+ *
  * 사전 조건: npx wrangler login 완료 상태
  * 사용법: node scripts/seed_prec.mjs
  */
@@ -19,6 +45,8 @@ const API_URL     = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}
 const PREC_DIR = path.join(BASE_DIR, "판례자료");
 
 // ── wrangler 토큰 읽기 ──────────────────────────────────────
+// USERPROFILE(Windows)과 HOME(Unix) 양쪽 경로를 순서대로 시도해 OS에 무관하게
+// wrangler 로그인 토큰을 찾는다 — 둘 다 실패하면 null 반환 후 즉시 종료.
 function readWranglerToken() {
   const candidates = [
     path.join(process.env.USERPROFILE || process.env.HOME || "", ".wrangler", "config", "default.toml"),
@@ -50,6 +78,9 @@ async function d1(sql, params = []) {
   const data = await res.json();
   if (!data.success) {
     const msg = JSON.stringify(data.errors);
+    // Cloudflare 인증 오류(코드 10000/Authentication)는 흔히 OAuth 토큰 만료가
+    // 원인이므로, 다른 종류의 오류와 구분해 더 친절한 안내 메시지로 즉시 종료.
+    // (재시도해도 토큰이 갱신되지 않으므로 재시도 로직 대신 사용자 개입을 요구한다.)
     if (msg.includes("10000") || msg.includes("Authentication")) {
       console.error("\n❌ 인증 오류 — wrangler 토큰이 만료됐습니다.");
       console.error("   터미널에서 '! npx wrangler login' 을 실행 후 다시 시도하세요.\n");
@@ -142,7 +173,10 @@ async function main() {
       const content = fs.readFileSync(filePath, "utf8");
       const docName = fileName.replace(".md", "");
 
-      // 이미 있으면 스킵
+      // 이미 있으면 스킵 — INSERT OR IGNORE 대신 사전 SELECT로 직접 확인하는
+      // 방식. (folder_id, name) 조합으로 존재 여부를 먼저 조회해 중복이면
+      // INSERT 자체를 생략한다 — 스크립트 재실행 시 동일 문서가 쌓이지 않도록
+      // 하는 멱등성 보장 로직.
       const { results: existing } = await d1(
         "SELECT id FROM documents WHERE folder_id = ? AND name = ?",
         [folderId, docName]

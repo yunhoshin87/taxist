@@ -1,3 +1,8 @@
+// GET /api/stats — 세목별/일별 질문 통계 (마이페이지·관리자 대시보드 공용)
+//
+// 관리자(role==='admin')는 전체 회원의 통계를, 일반 회원은 본인 통계만 본다.
+// 이를 위해 각 쿼리에 조건부로 "WHERE q.user_id = ?"를 문자열로 끼워 넣고,
+// bind 인자도 admin 여부에 따라 빈 배열/[user.id]로 분기한다.
 import { getUser, requireAuth, json } from "../../_lib/auth.js";
 
 export async function onRequestGet(context) {
@@ -6,7 +11,7 @@ export async function onRequestGet(context) {
   const err  = requireAuth(user);
   if (err) return err;
 
-  // 세목별 질문·답변 집계
+  // 세목별 질문·답변 집계 (관리자: 전체 / 일반회원: 본인 것만)
   const { results: byCategory } = await env.DB.prepare(`
     SELECT
       q.tax_category,
@@ -22,7 +27,7 @@ export async function onRequestGet(context) {
     ORDER BY question_count DESC
   `).bind(...(user.role !== "admin" ? [user.id] : [])).all();
 
-  // 일별 질문 추이 (최근 30일)
+  // 일별 질문 추이 (최근 30일, 대시보드 그래프용)
   const { results: byDate } = await env.DB.prepare(`
     SELECT
       DATE(q.created_at) AS date,
@@ -35,7 +40,7 @@ export async function onRequestGet(context) {
     ORDER BY date DESC
   `).bind(...(user.role !== "admin" ? [user.id] : [])).all();
 
-  // 전체 요약
+  // 전체 요약 (카드 형태로 표시되는 총계)
   const { results: [summary] } = await env.DB.prepare(`
     SELECT
       COUNT(q.id)                                              AS total_questions,
