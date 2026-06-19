@@ -14,11 +14,7 @@ import { ocrToMarkdown } from "../_lib/gemini.js";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB — 첨부서류 카드의 안내 문구와 동일
 const MIME_MAP = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
+  pdf: "application/pdf", // 이미지 업로드는 지원하지 않음(PDF만 허용)
 };
 
 export async function onRequest({ request, env }) {
@@ -39,7 +35,7 @@ export async function onRequest({ request, env }) {
   const ext  = file.name.split(".").pop().toLowerCase();
   const mime = MIME_MAP[ext];
   if (!mime)
-    return json({ error: `OCR을 지원하지 않는 파일 형식입니다 (${file.name}). PDF 또는 이미지(PNG/JPG) 파일만 가능합니다.` }, 400);
+    return json({ error: `OCR을 지원하지 않는 파일 형식입니다 (${file.name}). PDF 파일만 업로드 가능합니다.` }, 400);
 
   try {
     const buffer   = await file.arrayBuffer();
