@@ -273,16 +273,11 @@ Cloudflare Dashboard → Pages → taxist → Settings → Environment Variables
 |--------|-----|------|
 | `GEMINI_API_KEY` | Google AI Studio에서 발급한 키 | ✅ 필수 |
 | `JWT_SECRET` | 무작위 64자 이상 문자열 (예: `openssl rand -base64 48`) | ✅ 필수 |
-| `GOOGLE_CLIENT_EMAIL` | Document AI용 GCP 서비스 계정 이메일 | 첨부파일 OCR 기능 필수 |
-| `GOOGLE_PRIVATE_KEY` | 위 서비스 계정 키(JSON)의 `private_key` 값 (PEM, `\n` 포함된 한 줄 문자열) | 첨부파일 OCR 기능 필수 |
-| `GOOGLE_PROJECT_ID` | Document AI 프로세서가 속한 GCP 프로젝트 ID | 첨부파일 OCR 기능 필수 |
-| `DOCAI_PROCESSOR_ID` | GCP Console에서 생성한 Document AI OCR 프로세서 ID | 첨부파일 OCR 기능 필수 |
-| `DOCAI_LOCATION` | 프로세서 리전 (예: `us`, `eu`) — 미설정 시 `us` | 선택 |
 
 > ⚠️ `JWT_SECRET`이 없으면 로그인·회원가입 전혀 동작 안 함  
-> ⚠️ `GEMINI_API_KEY`가 없으면 AI 답변 생성 불가 (쿼리 확장도 비활성화됨)  
-> ⚠️ Google Document AI 변수가 없으면 `/api/ocr`(질문 첨부파일 OCR)이 동작하지 않음 — 첨부파일 업로드 시 에러로 표시됨. 첨부파일 자체는 선택 기능이라 나머지 서비스에는 영향 없음.
-> 📌 `functions/api/ocr.js`는 업로드된 원본 파일을 어디에도 저장하지 않는다 — Document AI로 변환한 마크다운 텍스트만 받아 질문 본문(`questions.content`)에 합쳐서 저장한다. 별도 파일 저장소(R2 등)는 사용하지 않는다.
+> ⚠️ `GEMINI_API_KEY`가 없으면 AI 답변 생성 불가 (쿼리 확장도 비활성화됨) — `/api/ocr`(첨부파일 OCR)도 같은 키를 쓰므로 함께 막힘  
+> 📌 `functions/api/ocr.js`는 별도 OCR API(Document AI 등) 없이 `GEMINI_API_KEY`로 Gemini 멀티모달 호출만 사용한다(`functions/_lib/gemini.js`의 `ocrToMarkdown()`). 업로드된 원본 파일은 어디에도 저장하지 않고, 변환된 마크다운 텍스트만 질문 본문(`questions.content`)에 합쳐서 저장한다. 별도 파일 저장소(R2 등)는 쓰지 않는다.  
+> ⚠️ 첨부파일 OCR도 답변 생성과 같은 Gemini 할당량 풀을 공유한다 — 첨부파일이 많은 질문일수록 API 호출 수가 늘어 분당/일일 한도가 더 빨리 소진될 수 있음 (§13.3 참고).
 
 ### 9.4 배포 빌드 디렉토리 준비
 
