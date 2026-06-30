@@ -734,6 +734,15 @@
       font-size: .7rem; color: var(--neutral-400); margin-top: 7px;
       padding-top: 7px; border-top: 1px solid var(--neutral-200);
     }
+    .source-list {
+      margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--neutral-200);
+      font-size: .82rem; color: var(--neutral-500);
+    }
+    .source-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
+    .source-list li { padding: 4px 0; }
+    .source-list .src-num { font-weight: 600; color: var(--neutral-400); margin-right: 4px; }
+    .source-list a { color: var(--primary); text-decoration: none; }
+    .source-list a:hover { text-decoration: underline; }
     .chat-footer {
       padding: 12px 16px;
       border-top: 1px solid var(--neutral-200);
@@ -1713,7 +1722,7 @@ function showAnswer(tax, mdContent, sources, answerId = null, isQuick = false, c
   // 내용 렌더링
   let bodyHtml;
   if (isQuick) {
-    bodyHtml = gapBanner + renderQuickAnswer(mdContent);
+    bodyHtml = gapBanner + linkifyLaws(renderQuickAnswer(mdContent));
   } else {
     const parts = mdContent.split(/^---\s*\n※/m);
     const body  = parts[0];
@@ -1723,6 +1732,8 @@ function showAnswer(tax, mdContent, sources, answerId = null, isQuick = false, c
         ? `<div class="warning-box">⚠️ ${note}</div>`
         : `<div class="warning-box">⚠️ 본 회신은 AI가 생성한 참고용 검토 의견입니다. 구체적 사실관계에 따라 결론이 달라질 수 있으며, 최종 법적 판단의 책임은 담당자에게 있습니다.</div>`);
   }
+  bodyHtml = linkifySourceRefs(bodyHtml, sources);
+  bodyHtml += renderSourceList(sources);
   document.getElementById('ansBody').innerHTML = bodyHtml;
 
   document.getElementById('answerCard').style.display = 'block';
@@ -1977,12 +1988,18 @@ function appendChatBubble(role, content, sources = [], createdAt = null, coverag
     : new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
   // XSS 방지: 내용 이스케이프 후 줄바꿈만 처리
-  const safe = content
+  let safe = content
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\n\n/g, '</p><p style="margin:6px 0 0">').replace(/\n/g, '<br>');
+  // 채팅 버블에는 별도 참고자료 목록이 없으므로, 점프 앵커가 아니라 외부 검색 링크로 직접 연결
+  safe = safe.replace(/\[자료\s*(\d+)\]/g, (full, n) => {
+    const i = Number(n);
+    if (!sources.length || i < 1 || i > sources.length) return full;
+    return `<a href="${buildSourceUrl(sources[i - 1])}" target="_blank" rel="noopener" title="${esc(sources[i - 1])}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
+  });
 
   const sourcesHtml = (sources.length && role === 'assistant')
-    ? `<div class="chat-sources">참고자료: ${sources.slice(0,4).map(s=>`📄 ${esc(s)}`).join(' · ')}</div>`
+    ? `<div class="chat-sources">참고자료: ${sources.slice(0,4).map(s=>`<a href="${buildSourceUrl(s)}" target="_blank" rel="noopener">📄 ${esc(s)}</a>`).join(' · ')}</div>`
     : '';
 
   // coverageGap=true이면 버블에 'coverage-gap' 클래스 추가 → 주황 배경 경고 스타일 적용
@@ -2078,6 +2095,39 @@ function linkifyLaws(html) {
   });
 
   return html;
+}
+
+/* ── 답변 본문의 [자료 N] 인용 → 하단 참고자료 목록으로 점프하는 링크로 변환 ──── */
+function linkifySourceRefs(html, sources) {
+  if (!sources || !sources.length) return html;
+  return html.replace(/\[자료\s*(\d+)\]/g, (full, n) => {
+    const i = Number(n);
+    if (i < 1 || i > sources.length) return full;
+    return `<a href="#src-ref-${i}" title="${esc(sources[i - 1])}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
+  });
+}
+
+/* ── 자료명에서 외부 원문/검색 링크를 최대한 추정해 붙인다 ──────────────────────
+   - 사건번호(예: 2020두12345) 포함 → law.go.kr 판례 검색
+   - 「법령명」 포함 → law.go.kr 법령 본문
+   - 그 외(서면질의/조심결정 등 문서번호만 있는 해석례) → 고유 딥링크가 없어
+     국세법령정보시스템 검색 페이지로만 연결(자동 검색어 채움은 불가) */
+function buildSourceUrl(name) {
+  const caseMatch = name.match(/\b(19|20)\d{2}[가-힣]{1,2}\d{2,6}\b/);
+  if (caseMatch) return `https://www.law.go.kr/precSc.do?query=${encodeURIComponent(caseMatch[0])}`;
+  const lawMatch = name.match(/「([^」]+)」/);
+  if (lawMatch) return `https://www.law.go.kr/법령/${encodeURIComponent(lawMatch[1])}`;
+  return 'https://taxlaw.nts.go.kr/qt/USEQTA001L.do?ntstDcmClCd=02';
+}
+
+/* ── 답변 하단에 [자료 N] 번호와 1:1 매칭되는 참고자료 목록을 렌더링 ──────────── */
+function renderSourceList(sources) {
+  if (!sources || !sources.length) return '';
+  const items = sources.map((s, i) => {
+    const url = buildSourceUrl(s);
+    return `<li id="src-ref-${i + 1}"><span class="src-num">[자료 ${i + 1}]</span> <a href="${url}" target="_blank" rel="noopener">📄 ${esc(s)} <span style="font-size:.75em">↗</span></a></li>`;
+  }).join('');
+  return `<div class="source-list"><strong>참고자료 출처</strong><ul>${items}</ul></div>`;
 }
 
 /* ── 보고서 공유 ──────────────────────────────────────────────────────────────

@@ -171,6 +171,21 @@ function linkifyLaws(html) {
 
   return html;
 }
+function buildSourceUrl(name) {
+  const caseMatch = name.match(/\b(19|20)\d{2}[가-힣]{1,2}\d{2,6}\b/);
+  if (caseMatch) return `https://www.law.go.kr/precSc.do?query=${encodeURIComponent(caseMatch[0])}`;
+  const lawMatch = name.match(/「([^」]+)」/);
+  if (lawMatch) return `https://www.law.go.kr/법령/${encodeURIComponent(lawMatch[1])}`;
+  return 'https://taxlaw.nts.go.kr/qt/USEQTA001L.do?ntstDcmClCd=02';
+}
+function linkifySourceRefs(html, sources) {
+  if (!sources || !sources.length) return html;
+  return html.replace(/\[자료\s*(\d+)\]/g, (full, n) => {
+    const i = Number(n);
+    if (i < 1 || i > sources.length) return full;
+    return `<a href="#src-ref-${i}" title="${esc(sources[i - 1])}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
+  });
+}
 function renderReport(md) {
   const lines = md.split('\n'); let html = '', i = 0;
   while (i < lines.length) {
@@ -256,15 +271,18 @@ function renderSectionBody(text) {
     const parts  = data.content.split(/^---\s*\n※/m);
     const body   = parts[0];
     const note   = parts[1] ? '※' + parts[1].trim() : '';
-    document.getElementById('ansBody').innerHTML =
-      linkifyLaws(renderReport(body)) +
+    let ansHtml = linkifyLaws(renderReport(body)) +
       (note
         ? `<div class="warning-box">⚠️ ${note}</div>`
         : `<div class="warning-box">⚠️ 본 보고서는 AI가 등록된 참고자료에 근거하여 생성한 참고용 검토 의견입니다.</div>`);
+    ansHtml = linkifySourceRefs(ansHtml, data.sources || []);
+    document.getElementById('ansBody').innerHTML = ansHtml;
 
     const sourcesEl = document.getElementById('sourcesEl');
     if (data.sources?.length) {
-      sourcesEl.innerHTML = data.sources.map(s => `<span class="source-chip">📄 ${esc(s)}</span>`).join('');
+      sourcesEl.innerHTML = data.sources.map((s, i) =>
+        `<a class="source-chip" id="src-ref-${i + 1}" href="${buildSourceUrl(s)}" target="_blank" rel="noopener">📄 [자료 ${i + 1}] ${esc(s)}</a>`
+      ).join('');
     } else {
       sourcesEl.textContent = '정보 없음';
     }
