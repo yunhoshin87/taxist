@@ -1732,13 +1732,11 @@ function showAnswer(tax, mdContent, sources, answerId = null, isQuick = false, c
   document.getElementById('ratingDown').className = 'rating-btn';
   document.getElementById('shareBtn').textContent = '🔗 공유';
 
-  _isEditMode = true;
+  _isEditMode = false;
   const ansBody = document.getElementById('ansBody');
-  ansBody.contentEditable = 'true';
-  ansBody.addEventListener('input', onAnswerEdit);
-  document.getElementById('editToggleBtn').classList.add('active');
-  document.getElementById('editToggleBtn').textContent = '✅ 편집 완료';
-  setSaveStatus('edited', '편집 중 — 변경 시 자동저장');
+  ansBody.contentEditable = 'false';
+  document.getElementById('editToggleBtn').classList.remove('active');
+  document.getElementById('editToggleBtn').textContent = '✏️ 편집';
 }
 
 /* ── 편집 모드 토글 ──
