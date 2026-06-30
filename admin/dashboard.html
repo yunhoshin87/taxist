@@ -240,7 +240,7 @@ document.getElementById('adminName').textContent = localStorage.getItem('adminNa
 document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 
 // 세목별 막대 그래프 색상. 디자인 고정 값이라 API 응답에는 없고 프론트에 하드코딩한다.
-const catColors = {'법인세':'#3B5BDB','부가세':'#0CA678','조사':'#F76707','징세':'#E64980','재산세':'#7048E8','개인세':'#1098AD'};
+const catColors = {'법인세':'#3B5BDB','소득세':'#1098AD','부가세':'#0CA678','원천세':'#F76707','종합부동산세':'#7048E8','양도소득세':'#E64980','상속세':'#D9480F','증여세':'#AE3EC9'};
 
 // 대시보드의 모든 위젯은 결국 회원/질문 두 목록 데이터를 다른 방식으로 잘라본 것이므로,
 // 별도 집계 API 없이 두 API를 한 번에 병렬로 받아 이 함수 안에서 전부 가공한다.
@@ -278,8 +278,8 @@ async function loadDashboard() {
 
   // 막대 그래프용 세목별 질문 수 집계. 6개 세목을 키로 미리 0으로 초기화해두는 이유는
   // 질문이 0건인 세목도 막대를 비워서라도 항상 표시해야 하기 때문(없는 키는 그래프에서 누락됨).
-  // tax_category가 정의된 6개 세목 외의 값이면(데이터 이상치) 조용히 무시한다.
-  const catMap = {'법인세':0,'부가세':0,'조사':0,'징세':0,'재산세':0,'개인세':0};
+  // tax_category가 정의된 8개 세목 외의 값이면(데이터 이상치) 조용히 무시한다.
+  const catMap = {'법인세':0,'소득세':0,'부가세':0,'원천세':0,'종합부동산세':0,'양도소득세':0,'상속세':0,'증여세':0};
   questions.forEach(q => { if (catMap[q.tax_category] !== undefined) catMap[q.tax_category]++; });
   // 막대 길이를 비율(%)로 환산하기 위한 기준값. 모든 세목이 0건이어도 0으로 나누지 않도록 최소 1을 보장한다.
   const maxCat = Math.max(...Object.values(catMap), 1);

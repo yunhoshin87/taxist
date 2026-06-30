@@ -500,8 +500,9 @@
             </div>
           </div>
 
-          <!-- 담당 세목 체크박스 6개의 value 값(corporate_tax, vat 등)이
-               백엔드 tax_categories 컬럼(JSON 배열)에 그대로 저장되는 코드값과 일치해야 한다. -->
+          <!-- 담당 세목 체크박스의 value 값(한글 세목명)이 백엔드 tax_categories
+               컬럼(JSON 배열)에 그대로 저장되며, functions/_lib/docs.js의
+               CATEGORY_MAP/INTERP_FOLDER_MAP/PREC_FOLDER_MAP 키와 일치해야 한다. -->
           <div class="edit-form" id="editForm">
             <div class="field-group">
               <span class="field-label">이름</span>
@@ -514,12 +515,14 @@
             <div class="field-group">
               <span class="field-label">담당 세목</span>
               <div class="tax-check-grid">
-                <div class="tc-item"><input type="checkbox" id="ec_corporate" value="corporate_tax" /><label for="ec_corporate"><span>🏢</span> 법인세</label></div>
-                <div class="tc-item"><input type="checkbox" id="ec_vat"       value="vat"           /><label for="ec_vat">      <span>🧾</span> 부가세</label></div>
-                <div class="tc-item"><input type="checkbox" id="ec_audit"     value="audit"         /><label for="ec_audit">    <span>🔎</span> 조사</label></div>
-                <div class="tc-item"><input type="checkbox" id="ec_collect"   value="collection"    /><label for="ec_collect">  <span>📬</span> 징세</label></div>
-                <div class="tc-item"><input type="checkbox" id="ec_property"  value="property_tax"  /><label for="ec_property"> <span>🏠</span> 재산세</label></div>
-                <div class="tc-item"><input type="checkbox" id="ec_individual" value="individual_tax"/><label for="ec_individual"><span>👤</span> 개인세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_corporate" value="법인세" /><label for="ec_corporate"><span>🏢</span> 법인세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_income"    value="소득세" /><label for="ec_income">   <span>💼</span> 소득세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_vat"       value="부가세" /><label for="ec_vat">      <span>🧾</span> 부가세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_withhold"  value="원천세" /><label for="ec_withhold"> <span>💳</span> 원천세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_compreal"  value="종합부동산세" /><label for="ec_compreal"><span>🏠</span> 종합부동산세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_capgains"  value="양도소득세" /><label for="ec_capgains"><span>🏷️</span> 양도소득세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_inherit"   value="상속세" /><label for="ec_inherit">  <span>👪</span> 상속세</label></div>
+                <div class="tc-item"><input type="checkbox" id="ec_gift"      value="증여세" /><label for="ec_gift">     <span>🎁</span> 증여세</label></div>
               </div>
             </div>
             <div class="edit-actions">

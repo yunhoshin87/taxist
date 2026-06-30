@@ -362,7 +362,7 @@
 
       <div class="tax-grid">
         <div class="tax-item">
-          <input type="checkbox" id="corporate_tax" name="tax[]" value="corporate_tax" />
+          <input type="checkbox" id="corporate_tax" name="tax[]" value="법인세" />
           <label for="corporate_tax">
             <span class="tax-emoji">🏢</span>
             <span class="tax-name">법인세</span>
@@ -370,7 +370,15 @@
           </label>
         </div>
         <div class="tax-item">
-          <input type="checkbox" id="vat" name="tax[]" value="vat" />
+          <input type="checkbox" id="income_tax" name="tax[]" value="소득세" />
+          <label for="income_tax">
+            <span class="tax-emoji">💼</span>
+            <span class="tax-name">소득세</span>
+            <span class="tax-en">Income Tax</span>
+          </label>
+        </div>
+        <div class="tax-item">
+          <input type="checkbox" id="vat" name="tax[]" value="부가세" />
           <label for="vat">
             <span class="tax-emoji">🧾</span>
             <span class="tax-name">부가세</span>
@@ -378,35 +386,43 @@
           </label>
         </div>
         <div class="tax-item">
-          <input type="checkbox" id="audit" name="tax[]" value="audit" />
-          <label for="audit">
-            <span class="tax-emoji">🔎</span>
-            <span class="tax-name">조사</span>
-            <span class="tax-en">Tax Audit</span>
+          <input type="checkbox" id="withholding_tax" name="tax[]" value="원천세" />
+          <label for="withholding_tax">
+            <span class="tax-emoji">💳</span>
+            <span class="tax-name">원천세</span>
+            <span class="tax-en">Withholding Tax</span>
           </label>
         </div>
         <div class="tax-item">
-          <input type="checkbox" id="collection" name="tax[]" value="collection" />
-          <label for="collection">
-            <span class="tax-emoji">📬</span>
-            <span class="tax-name">징세</span>
-            <span class="tax-en">Collection</span>
-          </label>
-        </div>
-        <div class="tax-item">
-          <input type="checkbox" id="property_tax" name="tax[]" value="property_tax" />
-          <label for="property_tax">
+          <input type="checkbox" id="comprehensive_real_estate_tax" name="tax[]" value="종합부동산세" />
+          <label for="comprehensive_real_estate_tax">
             <span class="tax-emoji">🏠</span>
-            <span class="tax-name">재산세</span>
-            <span class="tax-en">Property Tax</span>
+            <span class="tax-name">종합부동산세</span>
+            <span class="tax-en">Comprehensive Real Estate Tax</span>
           </label>
         </div>
         <div class="tax-item">
-          <input type="checkbox" id="individual_tax" name="tax[]" value="individual_tax" />
-          <label for="individual_tax">
-            <span class="tax-emoji">👤</span>
-            <span class="tax-name">개인세</span>
-            <span class="tax-en">Individual Tax</span>
+          <input type="checkbox" id="capital_gains_tax" name="tax[]" value="양도소득세" />
+          <label for="capital_gains_tax">
+            <span class="tax-emoji">🏷️</span>
+            <span class="tax-name">양도소득세</span>
+            <span class="tax-en">Capital Gains Tax</span>
+          </label>
+        </div>
+        <div class="tax-item">
+          <input type="checkbox" id="inheritance_tax" name="tax[]" value="상속세" />
+          <label for="inheritance_tax">
+            <span class="tax-emoji">👪</span>
+            <span class="tax-name">상속세</span>
+            <span class="tax-en">Inheritance Tax</span>
+          </label>
+        </div>
+        <div class="tax-item">
+          <input type="checkbox" id="gift_tax" name="tax[]" value="증여세" />
+          <label for="gift_tax">
+            <span class="tax-emoji">🎁</span>
+            <span class="tax-name">증여세</span>
+            <span class="tax-en">Gift Tax</span>
           </label>
         </div>
       </div>
