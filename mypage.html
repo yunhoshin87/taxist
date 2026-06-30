@@ -181,6 +181,11 @@
       background: var(--brand-light); color: var(--brand);
       border: 1px solid rgba(27,43,75,.15);
     }
+    .tax-migrate-notice {
+      margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+      background: #FFF7E6; border: 1px solid #FFD98C;
+      color: #8A5A00; font-size: .78rem; line-height: 1.5;
+    }
 
     /* ══ EDIT FORM ══ */
     .edit-btn {
@@ -498,6 +503,16 @@
                 <div class="tax-chips" id="viewTaxes"></div>
               </div>
             </div>
+          </div>
+
+          <!-- 담당 세목이 6개→8개 한글 항목으로 개편되면서, 예전에 영문 코드
+               (corporate_tax/vat/audit/collection/property_tax/individual_tax)로
+               저장된 회원은 새 체크박스 목록과 매칭되지 않는다. DB를 일괄
+               치환하는 대신 회원이 직접 재선택하도록 안내 배너를 띄운다. -->
+          <div id="taxMigrateNotice" class="tax-migrate-notice" style="display:none;">
+            ⚠️ 담당 세목 항목이 개편되었습니다. 기존에 선택하신 세목이 새 목록과
+            맞지 않아 표시되지 않을 수 있어요. 아래 [정보 수정]에서 담당 세목을
+            다시 선택해 주세요.
           </div>
 
           <!-- 담당 세목 체크박스의 value 값(한글 세목명)이 백엔드 tax_categories
@@ -818,6 +833,11 @@ function renderProfile(u) {
   document.getElementById('viewJoined').textContent = fmtDate(u.joined_at);
   const taxEl = document.getElementById('viewTaxes');
   taxEl.innerHTML = (u.tax_categories || []).map(t => `<span class="tax-chip">${t}</span>`).join('') || '—';
+
+  /* 새 세목 목록(8개)에 없는 값(예전 영문 코드 등)이 섞여 있으면 재선택 안내 */
+  const VALID_TAX_CATEGORIES = ['법인세','소득세','부가세','원천세','종합부동산세','양도소득세','상속세','증여세'];
+  const hasLegacyTax = (u.tax_categories || []).some(t => !VALID_TAX_CATEGORIES.includes(t));
+  document.getElementById('taxMigrateNotice').style.display = hasLegacyTax ? 'block' : 'none';
 
   /* 편집 폼 초기값 */
   document.getElementById('editName').value = u.name;
