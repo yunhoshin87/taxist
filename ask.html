@@ -1335,10 +1335,12 @@ function fmtSize(b) {
    고충민원의 세금 정보(연도기분/고지세액/청구세액 등)는 content 맨 앞에 사람이 읽을 수
    있는 "[관련세금 정보]" 블록으로 합쳐 넣는다. AI(Gemini)도 이 텍스트를 그대로 읽고
    답변을 생성하므로, 이 포맷이 곧 AI에게 전달되는 프롬프트 컨텍스트의 일부가 된다. */
-function buildTitle() {
-  const tax = selectedTax || (_taxCategories.join('/') || '');
-  if (currentType === '간단') return ['간단질의', tax].filter(Boolean).join(' ') || '간단 질의';
-  return ['일반질문', tax].filter(Boolean).join(' ') || '질문';
+/* 목록에서 세목 배지와 제목이 중복("법인세" + "일반질문 법인세")되지 않도록,
+   제목은 실제 질문 내용 첫 줄을 한 줄 요약으로 사용한다. */
+function buildTitle(content) {
+  const line = (content || '').split('\n').map(s => s.trim()).filter(Boolean)[0] || '';
+  if (!line) return currentType === '간단' ? '간단 질의' : '질문';
+  return line.length > 40 ? line.slice(0, 40) + '…' : line;
 }
 function buildContext() {
   const tax = _taxCategories.join(', ') || '-';
@@ -1536,7 +1538,7 @@ async function submitQuestion() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_token}` },
       body: JSON.stringify({
         tax_category:  selectedTax,
-        title:         buildTitle(),
+        title:         buildTitle(content),
         content:       buildContext() + content,
         question_type: currentType === '간단' ? 'quick' : 'full',
       }),

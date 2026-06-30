@@ -20,6 +20,23 @@ export async function onRequest(context) {
   return json({ error: "허용되지 않는 메서드" }, 405);
 }
 
+// "일반질문 법인세"/"간단질의 부가세"처럼 buildTitle()이 예전에 세목명만 붙여 만든
+// 제목인지 판별한다. (이 시기의 질문은 title이 항상 이 정규식과 정확히 일치한다)
+const GENERIC_TITLE_RE = /^(일반질문|간단질의)(\s.+)?$/;
+
+// content에서 사람이 입력한 실제 질문 텍스트만 뽑아 한 줄 요약 제목을 만든다.
+// content는 "[질문유형: ...]\n\n[첨부파일: x]\n...\n\n실제 질문" 형태로 저장되는데,
+// '['로 시작하는 단락(헤더/첨부 안내)은 모두 제외하고 마지막 단락(=실제 질문)만 사용한다.
+function deriveTitle(content) {
+  if (!content) return null;
+  const parts = content.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const real = parts.filter(p => !p.startsWith('[')).pop() || parts.pop();
+  if (!real) return null;
+  const line = real.split('\n')[0].trim();
+  if (!line) return null;
+  return line.length > 40 ? line.slice(0, 40) + '…' : line;
+}
+
 // GET /api/questions - 내 질문 목록 (페이지네이션, 20건씩)
 async function handleList({ request, env }) {
   const user = await getUser(request, env);
@@ -36,7 +53,7 @@ async function handleList({ request, env }) {
   if (search) {
     const like = `%${search}%`;
     ({ results } = await env.DB.prepare(`
-      SELECT q.id, q.tax_category, q.title, q.status, q.created_at, q.question_type,
+      SELECT q.id, q.tax_category, q.title, q.content, q.status, q.created_at, q.question_type,
              a.id AS answer_id
       FROM questions q
       LEFT JOIN answers a ON a.question_id = q.id
@@ -49,7 +66,7 @@ async function handleList({ request, env }) {
     ).bind(user.id, like, like).all());
   } else {
     ({ results } = await env.DB.prepare(`
-      SELECT q.id, q.tax_category, q.title, q.status, q.created_at, q.question_type,
+      SELECT q.id, q.tax_category, q.title, q.content, q.status, q.created_at, q.question_type,
              a.id AS answer_id
       FROM questions q
       LEFT JOIN answers a ON a.question_id = q.id
@@ -68,7 +85,15 @@ async function handleList({ request, env }) {
     ? Math.max(0, TRIAL_LIMIT - Number(cnt))
     : null;
 
-  return json({ questions: results, total: cnt, page, limit, trial_remaining: trialRemaining, trial_limit: TRIAL_LIMIT });
+  // 구버전 제목("일반질문 법인세" 등 세목명만 붙인 형태)은 content에서 실제
+  // 질문 내용을 뽑아 한 줄 요약으로 대체한다. DB는 건드리지 않고 응답 시에만 변환.
+  const questions = results.map(q => {
+    const title = GENERIC_TITLE_RE.test(q.title) ? (deriveTitle(q.content) || q.title) : q.title;
+    const { content, ...rest } = q;
+    return { ...rest, title };
+  });
+
+  return json({ questions, total: cnt, page, limit, trial_remaining: trialRemaining, trial_limit: TRIAL_LIMIT });
 }
 
 // POST /api/questions - 질문 등록 후 즉시 202 반환, AI 생성은 백그라운드(waitUntil)로 처리
