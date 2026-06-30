@@ -125,7 +125,7 @@ async function handlePost({ request, env }) {
     // questions/index.js의 generateAndSave와 달리, 채팅 답변은 DB에 coverage_gap을
     // 별도 컬럼으로 저장하지 않는다 — 채팅 메시지 이력에는 해당 컬럼이 없기 때문이며,
     // 클라이언트가 응답 시점에 실시간으로 표시하는 것으로 충분하다.
-    return json({ reply, sources: documents.map(d => d.name), coverage_gap: coverageGap });
+    return json({ reply, sources: documents.map(d => ({ id: d.id, name: d.name })), coverage_gap: coverageGap });
   } catch (e) {
     console.error(`[Chat Q${question_id}] 오류:`, e);
     return json({ error: "AI 답변 생성 중 오류가 발생했습니다: " + (e.message || String(e)) }, 500);

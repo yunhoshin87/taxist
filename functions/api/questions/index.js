@@ -142,7 +142,7 @@ async function generateAndSave(questionId, env, tax_category, content, questionT
       // sources는 반환값에 포함되지 않으므로 documents에서 직접 추출한다.
       const result = await generateQuickAnswer(content, tax_category, documents, env.GEMINI_API_KEY);
       answerContent = result.text;
-      sources       = documents.map(d => d.name); // 사용된 문서 이름 목록
+      sources       = documents.map(d => ({ id: d.id, name: d.name })); // 사용된 문서 목록
       coverageGap   = result.coverageGap;
     } else {
       // ── 일반(전체 보고서) 질의 경로 ────────────────────────────────

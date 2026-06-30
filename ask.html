@@ -741,8 +741,36 @@
     .source-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
     .source-list li { padding: 4px 0; }
     .source-list .src-num { font-weight: 600; color: var(--neutral-400); margin-right: 4px; }
-    .source-list a { color: var(--primary); text-decoration: none; }
+    .source-list a { color: var(--primary); text-decoration: none; cursor: pointer; }
     .source-list a:hover { text-decoration: underline; }
+
+    .source-modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+    }
+    .source-modal-overlay.open { display: flex; }
+    .source-modal {
+      background: var(--neutral-0); border-radius: 14px; width: 100%; max-width: 640px;
+      max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    .source-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--neutral-200);
+    }
+    .source-modal-header strong { font-size: .92rem; color: var(--neutral-900); }
+    .source-modal-header button {
+      border: none; background: none; cursor: pointer; font-size: 1rem;
+      color: var(--neutral-400); line-height: 1; padding: 4px;
+    }
+    .source-modal-body { padding: 18px; overflow-y: auto; }
+    .source-modal-content {
+      white-space: pre-wrap; word-break: break-word; font-family: inherit;
+      font-size: .85rem; line-height: 1.7; color: var(--neutral-700); margin: 0;
+    }
+    .source-modal-loading, .source-modal-error {
+      font-size: .85rem; color: var(--neutral-400); padding: 20px 0; text-align: center;
+    }
     .chat-footer {
       padding: 12px 16px;
       border-top: 1px solid var(--neutral-200);
@@ -1991,15 +2019,16 @@ function appendChatBubble(role, content, sources = [], createdAt = null, coverag
   let safe = content
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\n\n/g, '</p><p style="margin:6px 0 0">').replace(/\n/g, '<br>');
-  // 채팅 버블에는 별도 참고자료 목록이 없으므로, 점프 앵커가 아니라 외부 검색 링크로 직접 연결
+  // 채팅 버블에는 별도 참고자료 목록이 없으므로, 클릭 시 바로 원문 모달을 띄운다
   safe = safe.replace(/\[자료\s*(\d+)\]/g, (full, n) => {
     const i = Number(n);
     if (!sources.length || i < 1 || i > sources.length) return full;
-    return `<a href="${buildSourceUrl(sources[i - 1])}" target="_blank" rel="noopener" title="${esc(sources[i - 1])}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
+    const s = normSrc(sources[i - 1]);
+    return `<a href="javascript:void(0)" onclick="openSourceModal(${s.id ?? 'null'},'${escAttr(s.name)}')" title="${esc(s.name)}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
   });
 
   const sourcesHtml = (sources.length && role === 'assistant')
-    ? `<div class="chat-sources">참고자료: ${sources.slice(0,4).map(s=>`<a href="${buildSourceUrl(s)}" target="_blank" rel="noopener">📄 ${esc(s)}</a>`).join(' · ')}</div>`
+    ? `<div class="chat-sources">참고자료: ${sources.slice(0,4).map(raw=>{ const s=normSrc(raw); return `<a href="javascript:void(0)" onclick="openSourceModal(${s.id ?? 'null'},'${escAttr(s.name)}')">📄 ${esc(s.name)}</a>`; }).join(' · ')}</div>`
     : '';
 
   // coverageGap=true이면 버블에 'coverage-gap' 클래스 추가 → 주황 배경 경고 스타일 적용
@@ -2097,21 +2126,26 @@ function linkifyLaws(html) {
   return html;
 }
 
-/* ── 답변 본문의 [자료 N] 인용 → 하단 참고자료 목록으로 점프하는 링크로 변환 ──── */
+/* ── 자료 객체 정규화: 과거 저장분은 문자열 배열, 신규는 {id,name} 객체 배열 ──── */
+function normSrc(s) {
+  return (s && typeof s === 'object') ? s : { id: null, name: s };
+}
+
+/* ── 답변 본문의 [자료 N] 인용 → 클릭 시 원문 모달이 뜨는 링크로 변환 ──────────── */
 function linkifySourceRefs(html, sources) {
   if (!sources || !sources.length) return html;
   return html.replace(/\[자료\s*(\d+)\]/g, (full, n) => {
     const i = Number(n);
     if (i < 1 || i > sources.length) return full;
-    return `<a href="#src-ref-${i}" title="${esc(sources[i - 1])}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
+    const s = normSrc(sources[i - 1]);
+    return `<a href="javascript:void(0)" onclick="openSourceModal(${s.id ?? 'null'},'${escAttr(s.name)}')" title="${esc(s.name)}" style="color:var(--primary);font-weight:600;text-decoration:underline">[자료 ${i}]</a>`;
   });
 }
 
-/* ── 자료명에서 외부 원문/검색 링크를 최대한 추정해 붙인다 ──────────────────────
+/* ── id가 없는 구버전 자료(문자열만 저장된 과거 답변)를 위한 외부 링크 폴백 ──────
    - 사건번호(예: 2020두12345) 포함 → law.go.kr 판례 검색
    - 「법령명」 포함 → law.go.kr 법령 본문
-   - 그 외(서면질의/조심결정 등 문서번호만 있는 해석례) → 고유 딥링크가 없어
-     국세법령정보시스템 검색 페이지로만 연결(자동 검색어 채움은 불가) */
+   - 그 외 → 고유 딥링크가 없어 국세법령정보시스템 검색 페이지로만 연결 */
 function buildSourceUrl(name) {
   const caseMatch = name.match(/\b(19|20)\d{2}[가-힣]{1,2}\d{2,6}\b/);
   if (caseMatch) return `https://www.law.go.kr/precSc.do?query=${encodeURIComponent(caseMatch[0])}`;
@@ -2123,11 +2157,61 @@ function buildSourceUrl(name) {
 /* ── 답변 하단에 [자료 N] 번호와 1:1 매칭되는 참고자료 목록을 렌더링 ──────────── */
 function renderSourceList(sources) {
   if (!sources || !sources.length) return '';
-  const items = sources.map((s, i) => {
-    const url = buildSourceUrl(s);
-    return `<li id="src-ref-${i + 1}"><span class="src-num">[자료 ${i + 1}]</span> <a href="${url}" target="_blank" rel="noopener">📄 ${esc(s)} <span style="font-size:.75em">↗</span></a></li>`;
+  const items = sources.map((raw, i) => {
+    const s = normSrc(raw);
+    const trigger = s.id != null
+      ? `<a href="javascript:void(0)" onclick="openSourceModal(${s.id},'${escAttr(s.name)}')">📄 ${esc(s.name)}</a>`
+      : `<a href="${buildSourceUrl(s.name)}" target="_blank" rel="noopener">📄 ${esc(s.name)} <span style="font-size:.75em">↗</span></a>`;
+    return `<li id="src-ref-${i + 1}"><span class="src-num">[자료 ${i + 1}]</span> ${trigger}</li>`;
   }).join('');
   return `<div class="source-list"><strong>참고자료 출처</strong><ul>${items}</ul></div>`;
+}
+
+/* ── 자료명을 HTML 속성(작은따옴표 컨텍스트)에 안전하게 삽입하기 위한 이스케이프 ── */
+function escAttr(s) {
+  return esc(s).replace(/'/g, '&#39;');
+}
+
+/* ── [자료 N] 클릭 시 DB에 저장된 문서 원문을 모달로 표시 ───────────────────────
+   id가 없으면(구버전 답변) 외부 검색 페이지를 새 탭으로 연다. */
+async function openSourceModal(id, name) {
+  if (id == null) { window.open(buildSourceUrl(name), '_blank', 'noopener'); return; }
+
+  let modal = document.getElementById('sourceModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'sourceModal';
+    modal.className = 'source-modal-overlay';
+    modal.innerHTML = `
+      <div class="source-modal">
+        <div class="source-modal-header">
+          <strong id="sourceModalTitle"></strong>
+          <button onclick="closeSourceModal()" aria-label="닫기">✕</button>
+        </div>
+        <div class="source-modal-body" id="sourceModalBody"></div>
+      </div>`;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeSourceModal(); });
+    document.body.appendChild(modal);
+  }
+  document.getElementById('sourceModalTitle').textContent = name;
+  document.getElementById('sourceModalBody').innerHTML = '<div class="source-modal-loading">불러오는 중...</div>';
+  modal.classList.add('open');
+
+  try {
+    const res = await fetch(`/api/documents/${id}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '조회 실패');
+    document.getElementById('sourceModalBody').innerHTML =
+      `<pre class="source-modal-content">${esc(data.document.content)}</pre>`;
+  } catch (e) {
+    document.getElementById('sourceModalBody').innerHTML =
+      `<div class="source-modal-error">원문을 불러오지 못했습니다. (${esc(e.message)})</div>`;
+  }
+}
+
+function closeSourceModal() {
+  const modal = document.getElementById('sourceModal');
+  if (modal) modal.classList.remove('open');
 }
 
 /* ── 보고서 공유 ──────────────────────────────────────────────────────────────

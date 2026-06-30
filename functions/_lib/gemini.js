@@ -228,9 +228,10 @@ ${question}
 
   const text = await callGemini(prompt, apiKey);
 
-  // sources: 답변 생성에 사용된 참고문서 이름 목록 (questions/answers 테이블에
+  // sources: 답변 생성에 사용된 참고문서 목록 (questions/answers 테이블에
   // 함께 저장되어, 추후 "이 답변이 어떤 자료를 근거로 했는지" 추적 가능하게 한다)
-  const sources = documents.map(d => d.name);
+  // id를 함께 저장해 클라이언트가 /api/documents/:id로 원문을 조회할 수 있게 한다.
+  const sources = documents.map(d => ({ id: d.id, name: d.name }));
   return { content: text, sources };
 }
 
